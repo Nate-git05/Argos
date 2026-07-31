@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 import scservo_sdk as scs
 
-from application.server.local.config.config import ACTUATOR_PRESENT_POSITION_ADDR
+from application.server.local.config.config import ACTUATOR_GOAL_POSITION_ADDR, ACTUATOR_PRESENT_POSITION_ADDR
 
 ENGINE_READY_PATTERN = re.compile(r"bound to .* ready", re.IGNORECASE)
 
@@ -37,6 +37,19 @@ class ActuatorConnection:
                 return None
             positions.append(pos)
         return positions
+
+    def write_positions(self, commands: list[int]) -> bool:
+        """Writes Goal_Position for every connected servo, in servo_ids
+        order (commands must be the same length/order as servo_ids).
+        Returns False if ANY write fails -- caller must hard-stop rather
+        than continue commanding a partially-unresponsive arm."""
+        for servo_id, command in zip(self.servo_ids, commands):
+            result, _error = self.packet_handler.write2ByteTxRx(
+                self.port_handler, servo_id, ACTUATOR_GOAL_POSITION_ADDR, int(command)
+            )
+            if result != scs.COMM_SUCCESS:
+                return False
+        return True
 
 
 class SensorConnection:

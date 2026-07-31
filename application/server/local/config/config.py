@@ -28,6 +28,15 @@ ACTUATOR_BAUDRATE = 1_000_000  # SDK default for STS/SMS-series Feetech servos
 ACTUATOR_PROTOCOL_END = 0  # STS/SMS series; SCS series would be 1
 DEFAULT_SERVO_IDS = [1, 2, 3, 4, 5, 6]  # reference arm's servo IDs; caller can override
 ACTUATOR_PRESENT_POSITION_ADDR = 56  # common STS/SMS-series control-table address -- UNVERIFIED against your specific servo model
+ACTUATOR_GOAL_POSITION_ADDR = 42  # common STS/SMS-series control-table address -- UNVERIFIED against your specific servo model
+
+# PID gains -- PLACEHOLDER defaults, NOT tuned against real hardware. Must be
+# tuned on the actual arm before this is safe to run for real.
+PID_KP = 1.0
+PID_KI = 0.0
+PID_KD = 0.0
+PID_LOOP_HZ = 50
+PID_POSITION_TOLERANCE = 20  # servo position units -- PLACEHOLDER, needs tuning
 
 
 def load_model_catalog(path: Path = MODELS_YAML_PATH) -> dict:
