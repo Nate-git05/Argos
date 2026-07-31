@@ -128,9 +128,11 @@ class RunSession:
     one thread: the whole point is inference (slow) and PID correction
     (fast) proceeding concurrently, not one blocking the other."""
 
-    def __init__(self, model: str, instruction: str, log_lines: int = 200):
+    def __init__(self, model: str, instruction: str, tokenizer, max_state_dim: int, log_lines: int = 200):
         self.model = model
         self.instruction = instruction
+        self.tokenizer = tokenizer
+        self.max_state_dim = max_state_dim
 
         self._queue: deque[np.ndarray] = deque()
         self._queue_lock = threading.Lock()

@@ -15,7 +15,8 @@ from application.server.local.config.config import (
     load_model_catalog,
 )
 from application.server.local.routes import cli_commands
-from application.control.state import EngineConnection, state
+from application.control.inference import load_tokenizer
+from application.control.state import EngineConnection, RunSession, state
 
 console = Console()
 
@@ -89,7 +90,10 @@ def pull_model(name: str):
 
 
 @cli_commands.post("/run")
-def run_model(model: str):
+def run_model(model: str, instruction: str):
+    if not instruction or not instruction.strip():
+        raise HTTPException(status_code=400, detail="instruction is required")
+
     catalog = load_model_catalog()
 
     if model not in catalog:
@@ -122,6 +126,7 @@ def run_model(model: str):
         )
 
     ckpt_path, env = _resolve_launch_config(entry)
+    tokenizer = load_tokenizer(entry)  # fail before spawning the engine, not after
 
     process = subprocess.Popen(
         [str(VLA_SERVER_BINARY), ckpt_path, "--bind", ENGINE_BIND_ADDR],
@@ -143,6 +148,12 @@ def run_model(model: str):
         )
 
     state.engine = engine
+    state.run = RunSession(
+        model=model,
+        instruction=instruction,
+        tokenizer=tokenizer,
+        max_state_dim=entry["max_state_dim"],
+    )
 
     for sensor in state.sensors.values():
         sensor.start_capture()
