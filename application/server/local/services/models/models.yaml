@@ -9,20 +9,26 @@
 # V1.x+ catalog expansion — each still needs its launch command verified
 # against the actual HF repo before being wired into pull/run.
 #
-# camera_views / launch_args / launch_env / info_confidence fields below were
-# added after a full pass over the vla.cpp repo (src/serving/server.cpp,
-# src/model.cpp, src/models/*.cpp, eval/client/vla_cpp_client.py,
-# eval/client/adapters.py, eval/run_libero.sh, eval/run_libero_server.sh,
-# eval/run_aloha_server.sh, eval/run_simpler.sh, ci/lib/common.sh,
-# ci/config/matrix.env, README.md).
+# camera_views / launch_env / info_confidence fields below were added after
+# a full pass over the vla.cpp repo (src/serving/server.cpp, src/model.cpp,
+# src/models/*.cpp, eval/client/vla_cpp_client.py, eval/client/adapters.py,
+# eval/run_libero.sh, eval/run_libero_server.sh, eval/run_aloha_server.sh,
+# eval/run_simpler.sh, ci/lib/common.sh, ci/config/matrix.env, README.md).
 #
-# Repo-wide finding: `mmproj_path` is dead code for every one of these 11
+# Repo-wide finding: `mmproj_path` is dead code for every one of these
 # archs today — every `_create()` in src/models/*.cpp explicitly ignores it
 # ("(void) mmproj_path" / "mmproj '...' ignored" log line), and every real
 # invocation anywhere in the repo launches with exactly ONE positional arg
-# (the ckpt path), never a separate mmproj file. So despite server.cpp's
-# --help text describing a 1-vs-2-arg split by arch, in practice: always
-# pass just `<ckpt.gguf>`.
+# (the ckpt path), never a separate mmproj file. So there is no per-model
+# `launch_args` field below — it would just repeat this same constant
+# every time. The actual per-model launch command is always:
+#   vla-server <MODELS_DIR>/<filename> [launch_env vars] --bind <addr>
+#
+# launch_env holds ONLY env vars a model actually NEEDS for correct
+# behavior, with clean values ready to hand straight to a subprocess env
+# dict — nothing prose-y, nothing optional. Optional/tunable knobs (F32
+# overrides, debug flags, unnorm-key overrides, etc.) live in launch_notes
+# instead, as documentation only; code should never read launch_notes.
 
 smolvla:
   repo_id: vrfai/smolvla-libero-gguf
@@ -43,7 +49,6 @@ smolvla:
   camera_views:
     count: 2
     keys: [observation.images.image, observation.images.image2]
-  launch_args: "<smolvla-libero.gguf>  (single positional; mmproj ignored)"
   launch_env: {}
   info_confidence: high
   info_confidence_note: >
@@ -80,9 +85,8 @@ pi0:
   camera_views:
     count: 2
     keys: [observation.images.image, observation.images.image2]
-  launch_args: "<pi0-libero-finetuned-v044.gguf>  (single positional; mmproj ignored)"
-  launch_env:
-    VLA_PI0_F32_WEIGHTS: "optional — forces F32 weights (default bf16)"
+  launch_env: {}
+  launch_notes: "Optional: VLA_PI0_F32_WEIGHTS=1 forces F32 weights (default bf16)."
   info_confidence: high
   info_confidence_note: >
     Real invocation confirmed in eval/run_libero.sh:355-361,
@@ -117,10 +121,11 @@ bitvla:
   camera_views:
     count: 2
     keys: [observation.images.image, observation.images.image2]
-  launch_args: "<libero_object/bitvla-libero-object.gguf>  (single positional; mmproj ignored)"
-  launch_env:
-    VLA_BITVLA_UNNORM_KEY: "optional — selects stats suite key"
-    VLA_BITVLA_BF16_WEIGHTS: "optional — NOTE opposite default polarity from every other arch: bitvla defaults to F32; set =1 to opt into bf16"
+  launch_env: {}
+  launch_notes: >
+    Optional: VLA_BITVLA_UNNORM_KEY selects stats suite key.
+    VLA_BITVLA_BF16_WEIGHTS=1 opts into bf16 — NOTE opposite default
+    polarity from every other arch: bitvla defaults to F32.
   info_confidence: high
   info_confidence_note: >
     Launch mechanics confirmed via eval/run_libero.sh:391-397,
@@ -163,9 +168,8 @@ evo1:
       always sends 3 image slots with image_mask=[1,1,0] — 2 real camera
       views + 1 masked pad, not 2. Uses raw sim camera key names
       (obs.pixels.*), NOT the observation.images.* convention other archs use.
-  launch_args: "<evo1-libero.gguf>  (single positional; mmproj ignored)"
-  launch_env:
-    VLA_EVO1_F32_WEIGHTS: "optional — default bf16"
+  launch_env: {}
+  launch_notes: "Optional: VLA_EVO1_F32_WEIGHTS=1 forces F32 weights (default bf16)."
   info_confidence: high
   info_confidence_note: >
     Real invocation confirmed in eval/run_libero.sh:381-387,
@@ -196,10 +200,14 @@ gr00t-n1.5:
     count: 2
     keys: [video.image, video.wrist_image]
     note: "Hardcoded keys, different naming convention from observation.images.* used by other archs."
-  launch_args: "<gr00tn1d5-libero-object.gguf>  (single positional; mmproj ignored)"
   launch_env:
-    VLA_GR00T_EMBODIMENT: "new_embodiment — technically optional (baked default embodiment_id=24) but every real example sets it explicitly; treat as required"
-    VLA_GR00T_BF16_WEIGHTS: "1 — optional, memory only (default is F32 without it); effectively mandatory on the 8GB Orin Nano"
+    VLA_GR00T_EMBODIMENT: "new_embodiment"
+    VLA_GR00T_BF16_WEIGHTS: "1"
+  launch_notes: >
+    VLA_GR00T_EMBODIMENT technically has a baked default (embodiment_id=24)
+    but every real example sets it explicitly, so it's treated as required
+    here. VLA_GR00T_BF16_WEIGHTS defaults to unset (F32) — required here
+    specifically to fit the 8GB Orin Nano target.
   info_confidence: high
   info_confidence_note: >
     Real invocation confirmed in eval/run_libero.sh:428-436,
@@ -238,15 +246,14 @@ gr00t-n1.6:
       3 mutually-incompatible real deployments exist in this repo: LIBERO
       (2 views: video.image, video.wrist_image), SimplerEnv-bridge
       (1 view: image_0), ALOHA (1 view, name unconfirmed).
-  launch_args: >
-    Ambiguous — pick a deployment. LIBERO: <gr00tn1d6-libero.gguf>.
-    SimplerEnv-bridge: <gr00t-n1d6-bridge.gguf> --bind tcp://*:5566
-    (requires the 252px vision build; README.md warns the default 224px
-    build gets only ~20% success). ALOHA: <gr00t-n1d6-aloha.gguf>.
-  launch_env:
-    LIBERO: "VLA_GR00T_EMBODIMENT=libero_panda"
-    SimplerEnv_bridge: "VLA_GR00T_BF16_WEIGHTS=1 VLA_GR00T_EMBODIMENT=oxe_widowx"
-    ALOHA: "VLA_GR00T_EMBODIMENT=new_embodiment"
+  launch_env: null  # ambiguous, do not use for run without picking a deployment first — see launch_notes
+  launch_notes: >
+    3 mutually-incompatible real deployments exist, each with its own
+    checkpoint/env/view-count: LIBERO (<gr00tn1d6-libero.gguf>,
+    VLA_GR00T_EMBODIMENT=libero_panda), SimplerEnv-bridge
+    (<gr00t-n1d6-bridge.gguf> --bind tcp://*:5566, requires the 252px
+    vision build, VLA_GR00T_BF16_WEIGHTS=1 VLA_GR00T_EMBODIMENT=oxe_widowx),
+    ALOHA (<gr00t-n1d6-aloha.gguf>, VLA_GR00T_EMBODIMENT=new_embodiment).
   info_confidence: flag
   info_confidence_note: >
     AMBIGUOUS — not suitable for Orin Nano anyway (fits_orin_nano_8gb:
@@ -278,11 +285,12 @@ gr00t-n1.7:
   camera_views:
     count: 2
     keys: [video.image, video.wrist_image]
-  launch_args: "<libero_object/gr00tn1d7-libero-object.gguf>  (single positional; mmproj ignored)"
-  launch_env:
-    VLA_GR00T_EMBODIMENT: "do NOT set — unlike n1.5/n1.6, n1.7 uses the GGUF's own baked default embodiment (libero_sim); explicitly omitted in the real CI invocation"
-    VLA_GR00T_BF16_WEIGHTS: "optional, memory only"
-    VLA_NUM_STEPS: "optional — overrides denoising step count"
+  launch_env: {}
+  launch_notes: >
+    Do NOT set VLA_GR00T_EMBODIMENT — unlike n1.5/n1.6, n1.7 uses the
+    GGUF's own baked default embodiment (libero_sim); explicitly omitted
+    in the real CI invocation. Optional: VLA_GR00T_BF16_WEIGHTS (memory
+    only), VLA_NUM_STEPS (overrides denoising step count).
   info_confidence: high
   info_confidence_note: >
     Launch mechanics confirmed via eval/run_libero.sh:465-469,
