@@ -27,6 +27,7 @@ REQUIRED_CAMERA_VIEWS = 2
 ACTUATOR_BAUDRATE = 1_000_000  # SDK default for STS/SMS-series Feetech servos
 ACTUATOR_PROTOCOL_END = 0  # STS/SMS series; SCS series would be 1
 DEFAULT_SERVO_IDS = [1, 2, 3, 4, 5, 6]  # reference arm's servo IDs; caller can override
+ACTUATOR_PRESENT_POSITION_ADDR = 56  # common STS/SMS-series control-table address -- UNVERIFIED against your specific servo model
 
 
 def load_model_catalog(path: Path = MODELS_YAML_PATH) -> dict:
@@ -38,6 +39,8 @@ def load_model_catalog(path: Path = MODELS_YAML_PATH) -> dict:
             "repo_id": entry.get("repo_id"),
             "filename": entry.get("filename"),
             "launch_env": entry.get("launch_env"),
+            "tokenizer_repo": entry.get("tokenizer_repo"),
+            "max_state_dim": entry.get("max_state_dim"),
         }
         for name, entry in catalog.items()
     }

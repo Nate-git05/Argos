@@ -9,6 +9,8 @@ import cv2
 import numpy as np
 import scservo_sdk as scs
 
+from application.server.local.config.config import ACTUATOR_PRESENT_POSITION_ADDR
+
 ENGINE_READY_PATTERN = re.compile(r"bound to .* ready", re.IGNORECASE)
 
 
@@ -21,6 +23,20 @@ class ActuatorConnection:
 
     def close(self):
         self.port_handler.closePort()
+
+    def read_positions(self) -> list[int] | None:
+        """Reads Present_Position for every connected servo, in servo_ids
+        order. Returns None if ANY read fails -- the caller must hard-stop
+        rather than build a state vector from partial/stale data."""
+        positions = []
+        for servo_id in self.servo_ids:
+            pos, result, _error = self.packet_handler.read2ByteTxRx(
+                self.port_handler, servo_id, ACTUATOR_PRESENT_POSITION_ADDR
+            )
+            if result != scs.COMM_SUCCESS:
+                return None
+            positions.append(pos)
+        return positions
 
 
 class SensorConnection:
