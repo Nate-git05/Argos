@@ -1,4 +1,5 @@
 import os
+import subprocess
 
 from fastapi import HTTPException
 from huggingface_hub import hf_hub_download
@@ -6,13 +7,15 @@ from huggingface_hub.errors import HfHubHTTPError
 from rich.console import Console
 
 from application.server.local.config.config import (
+    ENGINE_BIND_ADDR,
     HF_CLIENT,
     MODELS_DIR,
     REQUIRED_CAMERA_VIEWS,
+    VLA_SERVER_BINARY,
     load_model_catalog,
 )
 from application.server.local.routes import cli_commands
-from application.server.local.tools.state import state
+from application.server.local.tools.state import EngineConnection, state
 
 console = Console()
 
@@ -106,9 +109,42 @@ def run_model(model: str):
             detail=f"only {len(state.sensors)}/{REQUIRED_CAMERA_VIEWS} camera views connected",
         )
 
+    if state.engine is not None and state.engine.process.poll() is None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"engine already running (model={state.engine.model}); stop it first",
+        )
+
+    if not VLA_SERVER_BINARY.is_file():
+        raise HTTPException(
+            status_code=500,
+            detail=f"vla-server binary not found at {VLA_SERVER_BINARY} -- run install/install.sh first",
+        )
+
     ckpt_path, env = _resolve_launch_config(entry)
+
+    process = subprocess.Popen(
+        [str(VLA_SERVER_BINARY), ckpt_path, "--bind", ENGINE_BIND_ADDR],
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    engine = EngineConnection(process=process, model=model, bind_addr=ENGINE_BIND_ADDR)
+
+    if not engine.wait_until_ready(timeout_s=60.0):
+        exit_code = process.poll()
+        last_logs = list(engine.logs)[-10:]
+        engine.stop()
+        raise HTTPException(
+            status_code=500,
+            detail=f"vla-server did not become ready (exit_code={exit_code}). Last logs: {last_logs}",
+        )
+
+    state.engine = engine
 
     for sensor in state.sensors.values():
         sensor.start_capture()
 
-    return {"model": model, "ckpt_path": ckpt_path, "env_overrides": catalog[model].get("launch_env")}
+    return {"model": model, "ckpt_path": ckpt_path, "bind_addr": ENGINE_BIND_ADDR, "pid": process.pid}

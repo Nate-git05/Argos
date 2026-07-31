@@ -1,15 +1,26 @@
+import re
+import subprocess
 import threading
+import time
+from collections import deque
 from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
-import serial
+import scservo_sdk as scs
+
+ENGINE_READY_PATTERN = re.compile(r"bound to .* ready", re.IGNORECASE)
 
 
 @dataclass
 class ActuatorConnection:
     port: str
-    handle: serial.Serial
+    port_handler: scs.PortHandler
+    packet_handler: scs.protocol_packet_handler
+    servo_ids: list[int]  # IDs that actually responded to ping at connect time
+
+    def close(self):
+        self.port_handler.closePort()
 
 
 class SensorConnection:
@@ -56,10 +67,49 @@ class SensorConnection:
         self.handle.release()
 
 
+class EngineConnection:
+    def __init__(self, process: subprocess.Popen, model: str, bind_addr: str, log_lines: int = 200):
+        self.process = process
+        self.model = model
+        self.bind_addr = bind_addr
+
+        self.logs: deque[str] = deque(maxlen=log_lines)
+        self.ready = threading.Event()
+        # Continuously drains stdout -- if nobody reads this pipe, its OS
+        # buffer fills up once vla-server starts logging normally and the
+        # process blocks on write(), silently stalling inference.
+        self._thread = threading.Thread(target=self._read_loop, daemon=True)
+        self._thread.start()
+
+    def _read_loop(self):
+        for line in self.process.stdout:
+            self.logs.append(line.rstrip("\n"))
+            if ENGINE_READY_PATTERN.search(line):
+                self.ready.set()
+
+    def wait_until_ready(self, timeout_s: float = 60.0) -> bool:
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            if self.ready.wait(timeout=0.5):
+                return True
+            if self.process.poll() is not None:
+                return False
+        return self.ready.is_set()
+
+    def stop(self):
+        if self.process.poll() is None:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+
+
 @dataclass
 class DaemonState:
     actuator: ActuatorConnection | None = None
     sensors: dict[str, SensorConnection] = field(default_factory=dict)
+    engine: EngineConnection | None = None
 
 
 state = DaemonState()

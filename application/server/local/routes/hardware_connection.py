@@ -1,16 +1,20 @@
 import base64
 
 import cv2
+import scservo_sdk as scs
 import serial
 import serial.tools.list_ports
-from fastapi import HTTPException
+from fastapi import HTTPException, Query
 
-from application.server.local.config.config import REQUIRED_CAMERA_VIEWS
+from application.server.local.config.config import (
+    ACTUATOR_BAUDRATE,
+    ACTUATOR_PROTOCOL_END,
+    DEFAULT_SERVO_IDS,
+    REQUIRED_CAMERA_VIEWS,
+)
 from application.server.local.routes import cli_commands
 from application.server.local.tools.state import ActuatorConnection, SensorConnection, state
 
-ACTUATOR_BAUDRATE = 115200
-ACTUATOR_TIMEOUT_S = 2
 CAMERA_PROBE_LIMIT = 10
 
 
@@ -22,23 +26,59 @@ def _discover_actuator_ports() -> list[dict]:
 
 
 @cli_commands.post("/connect/actuator")
-def connect_actuator(port: str | None = None):
+def connect_actuator(port: str | None = None, servo_ids: list[int] | None = Query(default=None)):
     if port is None:
         return {"ports": _discover_actuator_ports()}
 
+    ids = servo_ids or DEFAULT_SERVO_IDS
+
+    port_handler = scs.PortHandler(port)
     try:
-        handle = serial.Serial(port, baudrate=ACTUATOR_BAUDRATE, timeout=ACTUATOR_TIMEOUT_S)
+        port_opened = port_handler.openPort()
     except serial.SerialException as e:
         raise HTTPException(status_code=502, detail=f"failed to open {port!r}: {e}")
 
-    if not handle.is_open:
-        raise HTTPException(status_code=502, detail=f"port {port!r} did not open")
+    if not port_opened:
+        raise HTTPException(status_code=502, detail=f"failed to open {port!r}")
+
+    if not port_handler.setBaudRate(ACTUATOR_BAUDRATE):
+        port_handler.closePort()
+        raise HTTPException(status_code=502, detail=f"failed to set baud rate on {port!r}")
+
+    packet_handler = scs.PacketHandler(ACTUATOR_PROTOCOL_END)
+
+    responded = []
+    unresponsive = []
+    for servo_id in ids:
+        model_number, result, _error = packet_handler.ping(port_handler, servo_id)
+        if result == scs.COMM_SUCCESS:
+            responded.append({"id": servo_id, "model_number": model_number})
+        else:
+            unresponsive.append(servo_id)
+
+    if not responded:
+        port_handler.closePort()
+        raise HTTPException(
+            status_code=502,
+            detail=f"no servos responded on {port!r} (tried ids {ids})",
+        )
 
     if state.actuator is not None:
-        state.actuator.handle.close()
+        state.actuator.close()
 
-    state.actuator = ActuatorConnection(port=port, handle=handle)
-    return {"port": port, "connected": True}
+    state.actuator = ActuatorConnection(
+        port=port,
+        port_handler=port_handler,
+        packet_handler=packet_handler,
+        servo_ids=[s["id"] for s in responded],
+    )
+
+    return {
+        "port": port,
+        "connected": True,
+        "responded": responded,
+        "unresponsive": unresponsive,
+    }
 
 
 def _discover_cameras() -> list[dict]:
@@ -101,7 +141,7 @@ def connect_sensor(index: int | None = None, view_name: str | None = None):
 def _actuator_device() -> dict | None:
     if state.actuator is None:
         return None
-    return {"port": state.actuator.port, "connected": True}
+    return {"port": state.actuator.port, "servo_ids": state.actuator.servo_ids, "connected": True}
 
 
 def _sensor_devices() -> list[dict]:

@@ -9,6 +9,10 @@ MODELS_DIR = Path(__file__).resolve().parent.parent / "services" / "models"
 MODELS_YAML_PATH = MODELS_DIR / "models.yaml"
 ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
 
+ENGINE_DIR = Path(__file__).resolve().parent.parent / "services" / "engine"
+VLA_SERVER_BINARY = ENGINE_DIR / "build" / "vla-server"
+ENGINE_BIND_ADDR = "tcp://127.0.0.1:5555"
+
 load_dotenv(ENV_PATH)
 
 HUGGING_FACE_TOKEN = os.getenv("HUGGING_FACE_TOKEN")
@@ -18,6 +22,11 @@ if not HUGGING_FACE_TOKEN:
 HF_CLIENT = HfApi(token=HUGGING_FACE_TOKEN)
 
 REQUIRED_CAMERA_VIEWS = 2
+
+# Feetech (scservo_sdk) actuator protocol -- the only supported driver for V1.
+ACTUATOR_BAUDRATE = 1_000_000  # SDK default for STS/SMS-series Feetech servos
+ACTUATOR_PROTOCOL_END = 0  # STS/SMS series; SCS series would be 1
+DEFAULT_SERVO_IDS = [1, 2, 3, 4, 5, 6]  # reference arm's servo IDs; caller can override
 
 
 def load_model_catalog(path: Path = MODELS_YAML_PATH) -> dict:
