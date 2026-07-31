@@ -1,5 +1,6 @@
 import os
 import subprocess
+import threading
 
 from fastapi import HTTPException
 from huggingface_hub import hf_hub_download
@@ -14,7 +15,7 @@ from application.server.local.config.config import (
     load_model_catalog,
 )
 from application.server.local.routes import cli_commands
-from application.control.inference import load_tokenizer
+from application.control.inference import load_tokenizer, run_inference_worker
 from application.control.state import EngineConnection, RunSession, state
 
 console = Console()
@@ -161,5 +162,7 @@ def run_model(model: str, instruction: str):
 
     for sensor in state.sensors.values():
         sensor.start_capture()
+
+    threading.Thread(target=run_inference_worker, args=(state.run, entry), daemon=True).start()
 
     return {"model": model, "ckpt_path": ckpt_path, "bind_addr": ENGINE_BIND_ADDR, "pid": process.pid}
