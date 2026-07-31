@@ -1,3 +1,5 @@
+import os
+
 from fastapi import HTTPException
 from huggingface_hub import hf_hub_download
 from huggingface_hub.errors import HfHubHTTPError
@@ -18,6 +20,19 @@ console = Console()
 def _is_pulled(entry: dict) -> bool:
     filename = entry.get("filename")
     return bool(filename) and (MODELS_DIR / filename).is_file()
+
+
+def _resolve_launch_config(entry: dict) -> tuple[str, dict]:
+    launch_env = entry.get("launch_env")
+    if launch_env is None:
+        raise HTTPException(
+            status_code=400,
+            detail="this model has no single resolved launch configuration yet (ambiguous deployment variants)",
+        )
+
+    ckpt_path = str(MODELS_DIR / entry["filename"])
+    env = {**os.environ, **launch_env}
+    return ckpt_path, env
 
 
 @cli_commands.get("/list")
@@ -77,7 +92,9 @@ def run_model(model: str):
     if model not in catalog:
         raise HTTPException(status_code=404, detail=f"unknown model: {model}")
 
-    if not _is_pulled(catalog[model]):
+    entry = catalog[model]
+
+    if not _is_pulled(entry):
         raise HTTPException(status_code=400, detail=f"model {model!r} has not been pulled yet")
 
     if state.actuator is None:
@@ -89,7 +106,9 @@ def run_model(model: str):
             detail=f"only {len(state.sensors)}/{REQUIRED_CAMERA_VIEWS} camera views connected",
         )
 
+    ckpt_path, env = _resolve_launch_config(entry)
+
     for sensor in state.sensors.values():
         sensor.start_capture()
 
-    return {"model": model, "checks": "passed"}
+    return {"model": model, "ckpt_path": ckpt_path, "env_overrides": catalog[model].get("launch_env")}
