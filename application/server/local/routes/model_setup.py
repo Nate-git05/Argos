@@ -1,26 +1,34 @@
-from pathlib import Path
-
 from fastapi import HTTPException
 from huggingface_hub import hf_hub_download
 from huggingface_hub.errors import HfHubHTTPError
 from rich.console import Console
 
-from application.server.local.config.config import HF_CLIENT, MODELS_DIR, load_model_catalog
+from application.server.local.config.config import (
+    HF_CLIENT,
+    MODELS_DIR,
+    REQUIRED_CAMERA_VIEWS,
+    load_model_catalog,
+)
 from application.server.local.routes import cli_commands
+from application.server.local.tools.state import state
 
 console = Console()
+
+
+def _is_pulled(entry: dict) -> bool:
+    filename = entry.get("filename")
+    return bool(filename) and (MODELS_DIR / filename).is_file()
 
 
 @cli_commands.get("/list")
 def list_models():
     catalog = load_model_catalog()
-    pulled_files = {p.name for p in Path(MODELS_DIR).glob("*") if p.is_file()}
 
     models = {
         name: {
             "repo_id": entry["repo_id"],
             "filename": entry["filename"],
-            "pulled": bool(entry["filename"]) and entry["filename"] in pulled_files,
+            "pulled": _is_pulled(entry),
         }
         for name, entry in catalog.items()
     }
@@ -60,3 +68,28 @@ def pull_model(name: str):
 
     console.print(f"[green]done[/green] {name} -> {path}")
     return {"model": name, "path": path}
+
+
+@cli_commands.post("/run")
+def run_model(model: str):
+    catalog = load_model_catalog()
+
+    if model not in catalog:
+        raise HTTPException(status_code=404, detail=f"unknown model: {model}")
+
+    if not _is_pulled(catalog[model]):
+        raise HTTPException(status_code=400, detail=f"model {model!r} has not been pulled yet")
+
+    if state.actuator is None:
+        raise HTTPException(status_code=400, detail="no actuator connected")
+
+    if len(state.sensors) < REQUIRED_CAMERA_VIEWS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"only {len(state.sensors)}/{REQUIRED_CAMERA_VIEWS} camera views connected",
+        )
+
+    for sensor in state.sensors.values():
+        sensor.start_capture()
+
+    return {"model": model, "checks": "passed"}
