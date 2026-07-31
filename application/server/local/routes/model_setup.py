@@ -10,7 +10,6 @@ from application.server.local.config.config import (
     ENGINE_BIND_ADDR,
     HF_CLIENT,
     MODELS_DIR,
-    REQUIRED_CAMERA_VIEWS,
     VLA_SERVER_BINARY,
     load_model_catalog,
 )
@@ -107,10 +106,15 @@ def run_model(model: str, instruction: str):
     if state.actuator is None:
         raise HTTPException(status_code=400, detail="no actuator connected")
 
-    if len(state.sensors) < REQUIRED_CAMERA_VIEWS:
+    required_views = (entry.get("camera_views") or {}).get("keys") or []
+    missing_views = [v for v in required_views if v not in state.sensors]
+    if missing_views:
         raise HTTPException(
             status_code=400,
-            detail=f"only {len(state.sensors)}/{REQUIRED_CAMERA_VIEWS} camera views connected",
+            detail=(
+                f"missing required camera view(s): {missing_views}. "
+                f"Connect each with connect_sensor(view_name=<one of {required_views}>)"
+            ),
         )
 
     if state.engine is not None and state.engine.process.poll() is None:

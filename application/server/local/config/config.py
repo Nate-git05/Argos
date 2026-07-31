@@ -41,6 +41,8 @@ def load_model_catalog(path: Path = MODELS_YAML_PATH) -> dict:
             "launch_env": entry.get("launch_env"),
             "tokenizer_repo": entry.get("tokenizer_repo"),
             "max_state_dim": entry.get("max_state_dim"),
+            "image_size": entry.get("image_size"),
+            "camera_views": entry.get("camera_views"),
         }
         for name, entry in catalog.items()
     }

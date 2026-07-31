@@ -51,13 +51,15 @@ smolvla:
     keys: [observation.images.image, observation.images.image2]
   tokenizer_repo: HuggingFaceTB/SmolVLM2-500M-Instruct
   max_state_dim: 32
+  image_size: 512
   launch_env: {}
   info_confidence: high
   info_confidence_note: >
     Real invocation confirmed in README.md:135, eval/run_libero.sh:372-378,
     ci/lib/common.sh:87-88. Uses the client's generic/unsliced predict path
-    (vla_cpp_client.py:518-547), so all of image_keys is sent. tokenizer_repo
-    and max_state_dim confirmed via vla_cpp_client.py's ARCH_PRESETS dict.
+    (vla_cpp_client.py:518-547), so all of image_keys is sent. tokenizer_repo,
+    max_state_dim, and image_size confirmed via vla_cpp_client.py's
+    ARCH_PRESETS dict.
   benchmark_rtx_3060:
     success_rate: 90.5
     step_ms: 28.16
