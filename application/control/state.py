@@ -105,11 +105,48 @@ class EngineConnection:
                 self.process.kill()
 
 
+class RunSession:
+    """Shared between the inference worker and the PID worker -- two
+    separate background threads, each looping independently at its own
+    pace, coordinating only through this object. Never run both loops on
+    one thread: the whole point is inference (slow) and PID correction
+    (fast) proceeding concurrently, not one blocking the other."""
+
+    def __init__(self, model: str, instruction: str, log_lines: int = 200):
+        self.model = model
+        self.instruction = instruction
+
+        self._queue: deque[np.ndarray] = deque()
+        self._queue_lock = threading.Lock()
+
+        self.logs: deque[str] = deque(maxlen=log_lines)
+        self._logs_lock = threading.Lock()
+
+        self.stop = threading.Event()
+
+    def push_chunk(self, actions: list[np.ndarray]):
+        with self._queue_lock:
+            self._queue.extend(actions)
+
+    def pop_next(self) -> np.ndarray | None:
+        with self._queue_lock:
+            return self._queue.popleft() if self._queue else None
+
+    def is_empty(self) -> bool:
+        with self._queue_lock:
+            return len(self._queue) == 0
+
+    def log(self, stage: str, message: str):
+        with self._logs_lock:
+            self.logs.append(f"[{stage}] {message}")
+
+
 @dataclass
 class DaemonState:
     actuator: ActuatorConnection | None = None
     sensors: dict[str, SensorConnection] = field(default_factory=dict)
     engine: EngineConnection | None = None
+    run: RunSession | None = None
 
 
 state = DaemonState()
