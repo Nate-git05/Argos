@@ -15,7 +15,7 @@ from application.server.local.config.config import (
     load_model_catalog,
 )
 from application.server.local.routes import cli_commands
-from application.server.local.tools.state import EngineConnection, state
+from application.control.state import EngineConnection, state
 
 console = Console()
 

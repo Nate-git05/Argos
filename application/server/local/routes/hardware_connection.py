@@ -13,7 +13,7 @@ from application.server.local.config.config import (
     REQUIRED_CAMERA_VIEWS,
 )
 from application.server.local.routes import cli_commands
-from application.server.local.tools.state import ActuatorConnection, SensorConnection, state
+from application.control.state import ActuatorConnection, SensorConnection, state
 
 CAMERA_PROBE_LIMIT = 10
 

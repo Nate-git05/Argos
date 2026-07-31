@@ -4,7 +4,7 @@ import cv2
 from fastapi import WebSocket, WebSocketDisconnect
 
 from application.server.local.routes import cli_commands
-from application.server.local.tools.state import state
+from application.control.state import state
 
 STREAM_FPS = 15
 
