@@ -16,6 +16,7 @@ from application.server.local.config.config import (
 )
 from application.server.local.routes import cli_commands
 from application.control.inference import load_tokenizer, run_inference_worker
+from application.control.pid import run_pid_worker
 from application.control.state import EngineConnection, RunSession, state
 
 console = Console()
@@ -164,5 +165,6 @@ def run_model(model: str, instruction: str):
         sensor.start_capture()
 
     threading.Thread(target=run_inference_worker, args=(state.run, entry), daemon=True).start()
+    threading.Thread(target=run_pid_worker, args=(state.run,), daemon=True).start()
 
     return {"model": model, "ckpt_path": ckpt_path, "bind_addr": ENGINE_BIND_ADDR, "pid": process.pid}
