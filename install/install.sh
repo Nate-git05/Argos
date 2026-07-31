@@ -98,3 +98,36 @@ if [[ ! -x "${ENGINE_DIR}/build/vla-server" ]]; then
 fi
 
 log "done -- vla-server built at ${ENGINE_DIR}/build/vla-server"
+
+# --- 5. systemd service for the daemon --------------------------------------
+# The daemon (application/server/local/app.py) is what argos serve/run talk
+# to over HTTP -- this installs it as a systemd service so it survives
+# reboots/crashes instead of only running in a foreground terminal.
+DAEMON_HOST="127.0.0.1"
+DAEMON_PORT="8000"
+SERVICE_USER="${SUDO_USER:-$USER}"
+SERVICE_FILE="/etc/systemd/system/argos.service"
+
+log "installing systemd service (argos.service) -> daemon at http://${DAEMON_HOST}:${DAEMON_PORT}"
+sudo tee "${SERVICE_FILE}" >/dev/null <<EOF
+[Unit]
+Description=Argos daemon (local FastAPI server)
+After=network.target
+
+[Service]
+Type=simple
+User=${SERVICE_USER}
+WorkingDirectory=${REPO_ROOT}
+ExecStart=${VENV_DIR}/bin/uvicorn application.server.local.app:app --host ${DAEMON_HOST} --port ${DAEMON_PORT}
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable argos >/dev/null
+
+log "argos.service installed and enabled (not started yet)"
+log "NEXT STEP: set HUGGING_FACE_TOKEN in ${APP_DIR}/server/local/.env, then run: sudo systemctl start argos"
