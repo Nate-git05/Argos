@@ -1,0 +1,14 @@
+[Unit]
+Description=Argos daemon (local FastAPI server)
+After=network.target
+
+[Service]
+Type=simple
+User=__SERVICE_USER__
+WorkingDirectory=__REPO_ROOT__
+ExecStart=__VENV_DIR__/bin/uvicorn application.server.local.app:app --host __DAEMON_HOST__ --port __DAEMON_PORT__
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
