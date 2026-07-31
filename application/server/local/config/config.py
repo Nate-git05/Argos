@@ -25,6 +25,10 @@ def load_model_catalog(path: Path = MODELS_YAML_PATH) -> dict:
         catalog = yaml.safe_load(f)
 
     return {
-        name: {"repo_id": entry.get("repo_id"), "filename": entry.get("filename")}
+        name: {
+            "repo_id": entry.get("repo_id"),
+            "filename": entry.get("filename"),
+            "launch_env": entry.get("launch_env"),
+        }
         for name, entry in catalog.items()
     }
