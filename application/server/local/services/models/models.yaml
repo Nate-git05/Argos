@@ -1,0 +1,304 @@
+# RoboRun / Aiege model catalog
+# Sourced from the vla.cpp paper (arXiv:2606.08094) + individual HF model cards.
+# vla.cpp serves 7 architectures total. Of those, only 5 fit in the 8GB Orin
+# Nano's unified memory pool — GR00T-N1.6 and GR00T-N1.7 do NOT fit (their
+# ~6GB of weights exhaust the pool). This is the single most important
+# filter for V1/V1.x hardware-tier decisions.
+#
+# V1 supports only `smolvla`. Everything else below is reference data for
+# V1.x+ catalog expansion — each still needs its launch command verified
+# against the actual HF repo before being wired into pull/run.
+#
+# camera_views / launch_args / launch_env / info_confidence fields below were
+# added after a full pass over the vla.cpp repo (src/serving/server.cpp,
+# src/model.cpp, src/models/*.cpp, eval/client/vla_cpp_client.py,
+# eval/client/adapters.py, eval/run_libero.sh, eval/run_libero_server.sh,
+# eval/run_aloha_server.sh, eval/run_simpler.sh, ci/lib/common.sh,
+# ci/config/matrix.env, README.md).
+#
+# Repo-wide finding: `mmproj_path` is dead code for every one of these 11
+# archs today — every `_create()` in src/models/*.cpp explicitly ignores it
+# ("(void) mmproj_path" / "mmproj '...' ignored" log line), and every real
+# invocation anywhere in the repo launches with exactly ONE positional arg
+# (the ckpt path), never a separate mmproj file. So despite server.cpp's
+# --help text describing a 1-vs-2-arg split by arch, in practice: always
+# pass just `<ckpt.gguf>`.
+
+smolvla:
+  repo_id: vrfai/smolvla-libero-gguf
+  filename: smolvla-libero.gguf
+  params: 450M
+  vision_backbone: SigLIP-So400m
+  language_backbone: SmolLM2-360M
+  action_head: flow-matching cross-attention expert
+  n_action_steps: 1
+  solver_steps: 10
+  requires_gated_tokenizer: false
+  fits_orin_nano_8gb: true
+  status: "V1 — officially supported"
+  notes: >
+    vla.cpp's "golden reference" architecture — every other arch is
+    validated against this recipe. Simplest setup: no gating, no extra
+    stats files. Start here.
+  camera_views:
+    count: 2
+    keys: [observation.images.image, observation.images.image2]
+  launch_args: "<smolvla-libero.gguf>  (single positional; mmproj ignored)"
+  launch_env: {}
+  info_confidence: high
+  info_confidence_note: >
+    Real invocation confirmed in README.md:135, eval/run_libero.sh:372-378,
+    ci/lib/common.sh:87-88. Uses the client's generic/unsliced predict path
+    (vla_cpp_client.py:518-547), so all of image_keys is sent.
+  benchmark_rtx_3060:
+    success_rate: 90.5
+    step_ms: 28.16
+    inference_ms: 54.8
+    vram_mib: 1410
+  benchmark_orin_nano_8gb:
+    step_ms: 141.81
+    peak_rss_mib: 2031
+
+pi0:
+  repo_id: vrfai/pi0-libero-finetuned-v044-gguf
+  filename: pi0-libero-finetuned-v044.gguf
+  params: 3B
+  vision_backbone: SigLIP-So400m
+  language_backbone: Gemma-2B
+  action_head: flow-matching joint-attention expert
+  n_action_steps: 32
+  solver_steps: 10
+  requires_gated_tokenizer: true
+  gated_tokenizer_repo: google/paligemma-3b-pt-224
+  fits_orin_nano_8gb: true
+  fits_orin_nano_8gb_note: "split only — server+client+sim together exceed 8GB; benchmarked with sim offloaded to a second machine, so latency includes network hop"
+  status: "V1.x candidate"
+  notes: >
+    Needs `huggingface-cli login` + accepting the PaliGemma license before
+    first use. Cheapest per-step compute of all 7 archs, but least accurate
+    — long chunk replay lets the scene drift before replanning.
+  camera_views:
+    count: 2
+    keys: [observation.images.image, observation.images.image2]
+  launch_args: "<pi0-libero-finetuned-v044.gguf>  (single positional; mmproj ignored)"
+  launch_env:
+    VLA_PI0_F32_WEIGHTS: "optional — forces F32 weights (default bf16)"
+  info_confidence: high
+  info_confidence_note: >
+    Real invocation confirmed in eval/run_libero.sh:355-361,
+    eval/run_libero_server.sh:129-133, ci/lib/common.sh:79-80. Same
+    generic/unsliced predict path as smolvla.
+  benchmark_rtx_3060:
+    success_rate: 87.5
+    step_ms: 9.74
+    inference_ms: 207.2
+    vram_mib: 5548
+  benchmark_orin_nano_8gb_split:
+    step_ms: 39.10
+    peak_rss_mib: 6068
+
+bitvla:
+  repo_id: vrfai/bitvla-libero-gguf
+  filename: libero_object/bitvla-libero-object.gguf  # corrected from bitvla-libero.gguf — verify against live HF repo
+  params: 2.4B
+  vision_backbone: BitSigLIP-L (ternary)
+  language_backbone: BitNet-2B (ternary)
+  action_head: single-pass MLP regression (no solver loop)
+  requires_gated_tokenizer: false
+  fits_orin_nano_8gb: true
+  status: "V1.x candidate — strong second pick after smolvla"
+  notes: >
+    1-bit/ternary weights, smallest footprint of any served model
+    (1.3 GiB resident on Orin Nano) despite being 2.4B params. Highest
+    success rate of all 7 archs (100% on LIBERO-Object, RTX 3060). No
+    iterative solver loop — single forward pass emits the whole chunk.
+    vla.cpp includes a custom tensor-core ternary GEMM kernel for this
+    model specifically (4-4.6x additional speedup over the naive path).
+  camera_views:
+    count: 2
+    keys: [observation.images.image, observation.images.image2]
+  launch_args: "<libero_object/bitvla-libero-object.gguf>  (single positional; mmproj ignored)"
+  launch_env:
+    VLA_BITVLA_UNNORM_KEY: "optional — selects stats suite key"
+    VLA_BITVLA_BF16_WEIGHTS: "optional — NOTE opposite default polarity from every other arch: bitvla defaults to F32; set =1 to opt into bf16"
+  info_confidence: high
+  info_confidence_note: >
+    Launch mechanics confirmed via eval/run_libero.sh:391-397,
+    ci/lib/common.sh:91-93 (BITVLA_N_VIEWS=2, vla_cpp_client.py:61,832).
+    BUT the filename above was corrected from the prior entry using the
+    script's actual path ("libero_object/bitvla-libero-object.gguf"
+    instead of "bitvla-libero.gguf") — verify this matches the real HF
+    repo listing before first pull.
+  benchmark_rtx_3060:
+    success_rate: 100.0
+    step_ms: 37.85
+    inference_ms: 235.9
+    vram_mib: 1312
+  benchmark_orin_nano_8gb:
+    step_ms: 355.65
+    peak_rss_mib: 2199
+
+evo1:
+  repo_id: vrfai/evo1-libero-gguf
+  filename: evo1-libero.gguf
+  params: 770M
+  vision_backbone: InternViT-300M
+  language_backbone: Qwen2.5-0.5B
+  action_head: cross-attention DiT (flow-matching)
+  n_action_steps: 8
+  solver_steps: 32
+  requires_gated_tokenizer: false
+  fits_orin_nano_8gb: true
+  status: "V1.x candidate"
+  notes: >
+    Second-highest success rate of the 7 (94.5% on LIBERO-Object, RTX
+    3060), fits comfortably on Orin Nano. No known gating requirement,
+    but not yet individually verified against its HF model card the way
+    smolvla/pi0/vla-jepa were — check before adding to catalog.
+  camera_views:
+    count: 3
+    keys: ["obs.pixels.image (real, front)", "obs.pixels.image2 (real, wrist)", "zero-filled pad slot"]
+    note: >
+      Server-side view count is flexible, but the real client (adapters.py:75-89)
+      always sends 3 image slots with image_mask=[1,1,0] — 2 real camera
+      views + 1 masked pad, not 2. Uses raw sim camera key names
+      (obs.pixels.*), NOT the observation.images.* convention other archs use.
+  launch_args: "<evo1-libero.gguf>  (single positional; mmproj ignored)"
+  launch_env:
+    VLA_EVO1_F32_WEIGHTS: "optional — default bf16"
+  info_confidence: high
+  info_confidence_note: >
+    Real invocation confirmed in eval/run_libero.sh:381-387,
+    ci/lib/common.sh:89-90.
+  benchmark_rtx_3060:
+    success_rate: 94.5
+    step_ms: 63.60
+    inference_ms: 131.0
+    vram_mib: 1564
+  benchmark_orin_nano_8gb:
+    step_ms: 458.84
+    peak_rss_mib: 2135
+
+gr00t-n1.5:
+  repo_id: vrfai/gr00tn1d5-libero-object-gguf
+  filename: gr00tn1d5-libero-object.gguf
+  params: 3B
+  vision_backbone: SigLIP2-400M (Eagle-2.5 VLM)
+  language_backbone: Qwen3-1.7B
+  action_head: AltVL DiT + self-attention (diffusion)
+  n_action_steps: 16
+  solver_steps: 4
+  requires_gated_tokenizer: false
+  fits_orin_nano_8gb: true
+  fits_orin_nano_8gb_note: "split only — simulator offloaded to a second machine, benchmark includes network hop"
+  status: "V1.x candidate — filename now confirmed, launch args verified"
+  camera_views:
+    count: 2
+    keys: [video.image, video.wrist_image]
+    note: "Hardcoded keys, different naming convention from observation.images.* used by other archs."
+  launch_args: "<gr00tn1d5-libero-object.gguf>  (single positional; mmproj ignored)"
+  launch_env:
+    VLA_GR00T_EMBODIMENT: "new_embodiment — technically optional (baked default embodiment_id=24) but every real example sets it explicitly; treat as required"
+    VLA_GR00T_BF16_WEIGHTS: "1 — optional, memory only (default is F32 without it); effectively mandatory on the 8GB Orin Nano"
+  info_confidence: high
+  info_confidence_note: >
+    Real invocation confirmed in eval/run_libero.sh:428-436,
+    eval/run_libero_server.sh:135, ci/lib/common.sh:94-95, README.md:163.
+    Filename/repo_id both match the script's path exactly — no correction
+    needed.
+  benchmark_rtx_3060:
+    success_rate: 96.0
+    step_ms: 14.17
+    inference_ms: 147.0
+    vram_mib: 4866
+  benchmark_orin_nano_8gb_split:
+    step_ms: 84.76
+
+gr00t-n1.6:
+  repo_id: vrfai/gr00tn1d6-libero-gguf
+  filename: gr00tn1d6-libero.gguf  # LIBERO variant path — see info_confidence_note, this catalog key is ambiguous
+  params: 3B
+  vision_backbone: SigLIP2-400M (Eagle3-VL)
+  language_backbone: Qwen3-1.7B
+  action_head: AltVL DiT (diffusion)
+  n_action_steps: 16
+  solver_steps: 4
+  requires_gated_tokenizer: false
+  fits_orin_nano_8gb: false
+  status: "NOT SUITABLE for Orin Nano 8GB — do not add to V1/V1.x catalog for this hardware target"
+  notes: >
+    ~6GB resident weights exhaust the 8GB unified memory pool entirely —
+    does not fit even with the simulator offloaded elsewhere. Only usable
+    on higher-tier hardware (AGX Orin or better). Used in the paper's
+    real-robot ALOHA stress test (87.5% success vs 40% for PyTorch
+    baseline) — good architecture, wrong hardware tier for this product.
+  camera_views:
+    count: ambiguous
+    note: >
+      3 mutually-incompatible real deployments exist in this repo: LIBERO
+      (2 views: video.image, video.wrist_image), SimplerEnv-bridge
+      (1 view: image_0), ALOHA (1 view, name unconfirmed).
+  launch_args: >
+    Ambiguous — pick a deployment. LIBERO: <gr00tn1d6-libero.gguf>.
+    SimplerEnv-bridge: <gr00t-n1d6-bridge.gguf> --bind tcp://*:5566
+    (requires the 252px vision build; README.md warns the default 224px
+    build gets only ~20% success). ALOHA: <gr00t-n1d6-aloha.gguf>.
+  launch_env:
+    LIBERO: "VLA_GR00T_EMBODIMENT=libero_panda"
+    SimplerEnv_bridge: "VLA_GR00T_BF16_WEIGHTS=1 VLA_GR00T_EMBODIMENT=oxe_widowx"
+    ALOHA: "VLA_GR00T_EMBODIMENT=new_embodiment"
+  info_confidence: flag
+  info_confidence_note: >
+    AMBIGUOUS — not suitable for Orin Nano anyway (fits_orin_nano_8gb:
+    false), so lower priority, but this catalog key needs a decision on
+    which of the 3 real deployments (LIBERO/SimplerEnv-bridge/ALOHA) it
+    represents before it's usable — they use different checkpoints,
+    embodiments, and view counts, confirmed via eval/run_libero.sh:450-454,
+    eval/run_aloha_server.sh:19-47, README.md:171-176. Also: two conflicting
+    filename spellings exist between eval/run_libero.sh/ci/lib/common.sh:97
+    ("gr00tn1d6-...") and eval/run_libero_server.sh:138 ("gr00t-n1d6-...")
+    — verify against the actual HF repo before use.
+
+gr00t-n1.7:
+  repo_id: vrfai/gr00tn1d7-libero-gguf
+  filename: libero_object/gr00tn1d7-libero-object.gguf  # corrected from gr00tn1d7-libero.gguf — verify against live HF repo
+  params: 3B
+  vision_backbone: Qwen3-VL ViT
+  language_backbone: Qwen3-VL
+  action_head: AltVL DiT + self-attention (diffusion)
+  n_action_steps: 16
+  solver_steps: 4
+  requires_gated_tokenizer: false
+  fits_orin_nano_8gb: false
+  status: "NOT SUITABLE for Orin Nano 8GB — same memory issue as N1.6"
+  notes: >
+    Highest success rate of all 7 archs on LIBERO-Object (98.0%, RTX 3060),
+    but same ~6GB footprint problem as N1.6 — does not fit the 8GB target
+    hardware tier at all.
+  camera_views:
+    count: 2
+    keys: [video.image, video.wrist_image]
+  launch_args: "<libero_object/gr00tn1d7-libero-object.gguf>  (single positional; mmproj ignored)"
+  launch_env:
+    VLA_GR00T_EMBODIMENT: "do NOT set — unlike n1.5/n1.6, n1.7 uses the GGUF's own baked default embodiment (libero_sim); explicitly omitted in the real CI invocation"
+    VLA_GR00T_BF16_WEIGHTS: "optional, memory only"
+    VLA_NUM_STEPS: "optional — overrides denoising step count"
+  info_confidence: high
+  info_confidence_note: >
+    Launch mechanics confirmed via eval/run_libero.sh:465-469,
+    ci/lib/common.sh:98-100. Filename corrected from the prior entry
+    using the script's actual path; a second, conflicting hyphenation
+    ("gr00t-n1d7-...") appears in eval/run_libero_server.sh:141 — verify
+    against the actual HF repo before use.
+  benchmark_rtx_3060:
+    success_rate: 98.0
+    step_ms: 10.26
+    inference_ms: 84.1
+    vram_mib: 6302
+
+# Dropped from the catalog (kept here as a record, not as entries):
+# - vla-jepa: low confidence — zero real invocations anywhere in vla.cpp.
+# - vla-adapter: medium confidence — repo_id itself unverified.
+# - pi05, openvla-oft: still being finetuned upstream by their devs, not
+#   stable enough to catalog yet.
+# Revisit once these are better attested / upstream finetuning settles.
