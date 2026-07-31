@@ -1,10 +1,12 @@
 import asyncio
 
 import cv2
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 
-from application.server.local.routes import cli_commands
+from application.control.pid import move_to_positions
 from application.control.state import state
+from application.server.local.config.config import ACTUATOR_HOME_POSITION, ACTUATOR_HOME_TIMEOUT_S
+from application.server.local.routes import cli_commands
 
 STREAM_FPS = 15
 
@@ -28,3 +30,36 @@ async def view_sensor(websocket: WebSocket, view_name: str):
             await asyncio.sleep(interval_s)
     except WebSocketDisconnect:
         pass
+
+
+@cli_commands.post("/stop")
+def stop_run():
+    """Safe-stop: halts both workers, drives the arm to its home position,
+    tears down the vla-server child process -- the daemon itself (this
+    route included) keeps running the whole time."""
+    if state.run is None:
+        raise HTTPException(status_code=400, detail="no run is active")
+
+    run_session = state.run
+    run_session.stop.set()
+
+    if run_session.inference_thread is not None:
+        run_session.inference_thread.join(timeout=5)
+    if run_session.pid_thread is not None:
+        run_session.pid_thread.join(timeout=5)
+
+    home_reached = False
+    if state.actuator is not None:
+        home_targets = [ACTUATOR_HOME_POSITION] * len(state.actuator.servo_ids)
+        home_reached = move_to_positions(home_targets, timeout_s=ACTUATOR_HOME_TIMEOUT_S)
+
+    if state.engine is not None:
+        state.engine.stop()
+
+    for sensor in state.sensors.values():
+        sensor.pause_capture()
+
+    state.run = None
+    state.engine = None
+
+    return {"stopped": True, "home_reached": home_reached}

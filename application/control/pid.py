@@ -66,3 +66,41 @@ def run_pid_worker(run_session: RunSession):
             current_target = None
 
         time.sleep(PID_LOOP_PERIOD_S)
+
+
+def move_to_positions(target_positions: list[float], timeout_s: float) -> bool:
+    """One-shot convergence, same PID gains/tolerance as run_pid_worker but
+    without a queue -- drives toward a single fixed target and blocks until
+    within tolerance or timeout_s elapses. Used by /stop to return the arm
+    to its home position. Returns whether it actually converged."""
+    servo_ids = state.actuator.servo_ids
+    n = len(servo_ids)
+    target = np.zeros(n, dtype=np.float32)
+    avail = min(n, len(target_positions))
+    target[:avail] = np.asarray(target_positions[:avail], dtype=np.float32)
+
+    integral = np.zeros(n, dtype=np.float32)
+    prev_error = np.zeros(n, dtype=np.float32)
+
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        positions = state.actuator.read_positions()
+        if positions is None:
+            return False
+        positions = np.array(positions, dtype=np.float32)
+
+        error = target - positions
+        if np.all(np.abs(error) < PID_POSITION_TOLERANCE):
+            return True
+
+        integral += error * PID_LOOP_PERIOD_S
+        derivative = (error - prev_error) / PID_LOOP_PERIOD_S
+        correction = PID_KP * error + PID_KI * integral + PID_KD * derivative
+        prev_error = error
+
+        if not state.actuator.write_positions(positions + correction):
+            return False
+
+        time.sleep(PID_LOOP_PERIOD_S)
+
+    return False

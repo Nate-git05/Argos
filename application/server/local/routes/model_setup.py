@@ -164,7 +164,9 @@ def run_model(model: str, instruction: str):
     for sensor in state.sensors.values():
         sensor.start_capture()
 
-    threading.Thread(target=run_inference_worker, args=(state.run, entry), daemon=True).start()
-    threading.Thread(target=run_pid_worker, args=(state.run,), daemon=True).start()
+    state.run.inference_thread = threading.Thread(target=run_inference_worker, args=(state.run, entry), daemon=True)
+    state.run.pid_thread = threading.Thread(target=run_pid_worker, args=(state.run,), daemon=True)
+    state.run.inference_thread.start()
+    state.run.pid_thread.start()
 
     return {"model": model, "ckpt_path": ckpt_path, "bind_addr": ENGINE_BIND_ADDR, "pid": process.pid}

@@ -155,6 +155,12 @@ class RunSession:
 
         self.stop = threading.Event()
 
+        # Set by run_model right after starting each worker, so /stop can
+        # join them and know the loops have actually exited before tearing
+        # down the engine/actuator underneath them.
+        self.inference_thread: threading.Thread | None = None
+        self.pid_thread: threading.Thread | None = None
+
     def push_chunk(self, actions: list[np.ndarray]):
         with self._queue_lock:
             self._queue.extend(actions)

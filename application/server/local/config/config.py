@@ -38,6 +38,12 @@ PID_KD = 0.0
 PID_LOOP_HZ = 50
 PID_POSITION_TOLERANCE = 20  # servo position units -- PLACEHOLDER, needs tuning
 
+# Mechanical center of a 12-bit position sensor (0-4095) -- PLACEHOLDER, NOT a
+# verified safe pose for your specific arm/joint limits. Applied uniformly to
+# every connected servo on /stop. Tune per-joint before relying on this.
+ACTUATOR_HOME_POSITION = 2048
+ACTUATOR_HOME_TIMEOUT_S = 5.0
+
 
 def load_model_catalog(path: Path = MODELS_YAML_PATH) -> dict:
     with open(path, "r") as f:
