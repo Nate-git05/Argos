@@ -70,6 +70,16 @@ def connect_sensor(index: int | None = None, view_name: str | None = None):
         cap.release()
         raise HTTPException(status_code=502, detail=f"camera index {index} did not open")
 
+    ok, test_frame = cap.read()
+    if not ok:
+        cap.release()
+        raise HTTPException(
+            status_code=502,
+            detail=f"camera index {index} opened but failed to capture a test frame",
+        )
+    _, buf = cv2.imencode(".jpg", test_frame)
+    test_frame_jpeg_b64 = base64.b64encode(buf).decode()
+
     existing = state.sensors.get(view_name)
     if existing is not None:
         existing.release()
@@ -81,7 +91,43 @@ def connect_sensor(index: int | None = None, view_name: str | None = None):
         "index": index,
         "view_name": view_name,
         "connected": True,
+        "test_frame_jpeg_b64": test_frame_jpeg_b64,
         "connected_views": list(state.sensors.keys()),
         "required_views": REQUIRED_CAMERA_VIEWS,
         "missing": missing,
     }
+
+
+def _actuator_device() -> dict | None:
+    if state.actuator is None:
+        return None
+    return {"port": state.actuator.port, "connected": True}
+
+
+def _sensor_devices() -> list[dict]:
+    return [
+        {"index": s.index, "view_name": s.view_name, "method": s.method, "connected": True}
+        for s in state.sensors.values()
+    ]
+
+
+@cli_commands.get("/devices")
+def list_devices(kind: str | None = None):
+    if kind == "actuator":
+        return {"actuator": _actuator_device()}
+    if kind == "sensor":
+        return {"sensors": _sensor_devices()}
+    if kind is not None:
+        raise HTTPException(status_code=400, detail=f"unknown kind {kind!r}; expected 'actuator' or 'sensor'")
+
+    return {"actuator": _actuator_device(), "sensors": _sensor_devices()}
+
+
+@cli_commands.get("/devices/actuators")
+def list_actuator_devices():
+    return {"actuator": _actuator_device()}
+
+
+@cli_commands.get("/devices/sensors")
+def list_sensor_devices():
+    return {"sensors": _sensor_devices()}
