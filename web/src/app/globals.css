@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+/*
+ * Argos web app design tokens. This is the single source of truth for
+ * color across the site -- components reference these via Tailwind
+ * utilities (bg-teal-500, text-heading, border-border, etc.), never
+ * hardcoded hex values.
+ */
+:root {
+  /* Teal -- CTAs, links, active states, brand mark. Only the six stops
+     below are defined; components should pick one of these exactly
+     rather than inventing an interpolated shade. */
+  --color-teal-50: #e1f5ee;
+  --color-teal-200: #9fe1cb;
+  --color-teal-400: #3fbe95;
+  --color-teal-500: #1d9e75; /* base */
+  --color-teal-700: #0f6e56;
+  --color-teal-900: #0a4f3e;
+
+  /* Neutrals */
+  --color-surface: #ffffff;
+  --color-surface-alt: #faf9f5;
+  --color-border: #e5e4de;
+  --color-muted: #a5a49c;
+  --color-body: #5f5e5a;
+  --color-heading: #1a1a18;
+}
+
+@theme inline {
+  --color-teal-50: var(--color-teal-50);
+  --color-teal-200: var(--color-teal-200);
+  --color-teal-400: var(--color-teal-400);
+  --color-teal-500: var(--color-teal-500);
+  --color-teal-700: var(--color-teal-700);
+  --color-teal-900: var(--color-teal-900);
+
+  --color-surface: var(--color-surface);
+  --color-surface-alt: var(--color-surface-alt);
+  --color-border: var(--color-border);
+  --color-muted: var(--color-muted);
+  --color-body: var(--color-body);
+  --color-heading: var(--color-heading);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--color-surface);
+  color: var(--color-body);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
