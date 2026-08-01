@@ -63,3 +63,24 @@ def stop_run():
     state.engine = None
 
     return {"stopped": True, "home_reached": home_reached}
+
+
+@cli_commands.get("/logs")
+def get_logs(source: str | None = None, limit: int = 50):
+    if source == "engine":
+        if state.engine is None:
+            raise HTTPException(status_code=400, detail="no engine running")
+        return {"engine": list(state.engine.logs)[-limit:]}
+
+    if source == "run":
+        if state.run is None:
+            raise HTTPException(status_code=400, detail="no run active")
+        return {"run": list(state.run.logs)[-limit:]}
+
+    if source is not None:
+        raise HTTPException(status_code=400, detail=f"unknown source {source!r}; expected 'engine' or 'run'")
+
+    return {
+        "engine": list(state.engine.logs)[-limit:] if state.engine is not None else None,
+        "run": list(state.run.logs)[-limit:] if state.run is not None else None,
+    }
