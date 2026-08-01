@@ -3,10 +3,8 @@
 import { ArrowLeft, FlaskConical } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
 import type { ModelEntry } from "@/lib/model-types";
 import { getCompatibilityStatus } from "@/lib/model-types";
-import { RegistrationModal } from "@/components/RegistrationModal";
 
 const statusDotColor: Record<string, string> = {
   Supported: "bg-teal-500",
@@ -19,7 +17,7 @@ export function Sidebar({ models }: { models: ModelEntry[] }) {
   const inModels = pathname.startsWith("/docs/models");
   const inCli = pathname.startsWith("/docs/cli");
   const inSdk = pathname.startsWith("/docs/sdk");
-  const [showRegistration, setShowRegistration] = useState(false);
+  const inSandbox = pathname.startsWith("/docs/sandbox");
 
   return (
     <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-border bg-surface-alt">
@@ -34,14 +32,15 @@ export function Sidebar({ models }: { models: ModelEntry[] }) {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-5">
-        <button
-          type="button"
-          onClick={() => setShowRegistration(true)}
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-body transition-colors hover:bg-black/[0.03] hover:text-heading cursor-pointer"
+        <Link
+          href="/docs/sandbox"
+          className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
+            inSandbox ? "bg-teal-50 text-teal-700" : "text-body hover:bg-black/[0.03] hover:text-heading"
+          }`}
         >
           <FlaskConical className="h-3.5 w-3.5 text-teal-700" strokeWidth={2} />
           Sandbox
-        </button>
+        </Link>
 
         <p className="mt-4 px-2 font-mono text-xs tracking-wide text-muted uppercase">Docs</p>
 
@@ -94,8 +93,6 @@ export function Sidebar({ models }: { models: ModelEntry[] }) {
           </Link>
         </div>
       </nav>
-
-      <RegistrationModal open={showRegistration} onClose={() => setShowRegistration(false)} />
     </aside>
   );
 }

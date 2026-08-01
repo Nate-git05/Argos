@@ -1,8 +1,14 @@
+"use client";
+
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
+import { RegistrationModal } from "@/components/RegistrationModal";
 import { Terminal } from "@/components/ui/Terminal";
 
 export function Hero() {
+  const [showRegistration, setShowRegistration] = useState(false);
+
   return (
     <section className="relative flex min-h-[92vh] flex-col items-center justify-center overflow-hidden px-6 pt-24 pb-16 text-center">
       <div
@@ -25,14 +31,25 @@ export function Hero() {
 
       <div className="mt-10 flex flex-col items-center gap-4">
         <Terminal command="curl -fsSL https://argos.sh/install | bash" />
-        <Link
-          href="/docs"
-          className="group inline-flex items-center gap-1 font-mono text-sm text-teal-700 transition-colors hover:text-teal-900"
-        >
-          Read the docs
-          <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-        </Link>
+        <div className="flex items-center gap-5">
+          <Link
+            href="/docs"
+            className="group inline-flex items-center gap-1 font-mono text-sm text-teal-700 transition-colors hover:text-teal-900"
+          >
+            Read the docs
+            <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+          </Link>
+          <button
+            type="button"
+            onClick={() => setShowRegistration(true)}
+            className="rounded-lg bg-teal-500 px-4 py-2.5 font-mono text-sm font-medium text-white transition-colors hover:bg-teal-700 cursor-pointer"
+          >
+            Register
+          </button>
+        </div>
       </div>
+
+      <RegistrationModal open={showRegistration} onClose={() => setShowRegistration(false)} />
     </section>
   );
 }
