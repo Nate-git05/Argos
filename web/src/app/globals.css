@@ -24,6 +24,15 @@
   --color-muted: #a5a49c;
   --color-body: #5f5e5a;
   --color-heading: #1a1a18;
+
+  /* CLI terminal scheme -- deliberately separate from the teal site
+     palette. Used ONLY inside embedded terminal/code examples (see
+     CliTerminal.tsx), never for page chrome, so a terminal block reads
+     as an actual terminal rather than a page section styled to match. */
+  --color-cli-bg: #0e0e0d;
+  --color-cli-amber: #ef9f27;
+  --color-cli-muted: #888780;
+  --color-cli-fg: #f2f1ec;
 }
 
 @theme inline {
@@ -40,6 +49,11 @@
   --color-muted: var(--color-muted);
   --color-body: var(--color-body);
   --color-heading: var(--color-heading);
+
+  --color-cli-bg: var(--color-cli-bg);
+  --color-cli-amber: var(--color-cli-amber);
+  --color-cli-muted: var(--color-cli-muted);
+  --color-cli-fg: var(--color-cli-fg);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);

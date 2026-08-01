@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
 import {
   getBenchmarkRows,
   getCompatibilityStatus,
@@ -9,11 +8,7 @@ import {
   type ModelEntry,
 } from "@/lib/model-types";
 import { StatusBadge } from "@/components/docs/StatusBadge";
-
-interface Section {
-  id: string;
-  label: string;
-}
+import { StickyNav, type NavSection } from "@/components/docs/StickyNav";
 
 function fmt(value: number | undefined, suffix = ""): string {
   return value === undefined ? "—" : `${value}${suffix}`;
@@ -24,36 +19,13 @@ export function ModelDetail({ model }: { model: ModelEntry }) {
   const prerequisites = getPrerequisites(model);
   const benchmarkRows = getBenchmarkRows(model);
 
-  const sections: Section[] = [
+  const sections: NavSection[] = [
     { id: "overview", label: "Overview" },
     { id: "architecture", label: "Architecture" },
     ...(prerequisites.length > 0 ? [{ id: "prerequisites", label: "Prerequisites" }] : []),
     { id: "hardware-fit", label: "Hardware fit" },
     ...(benchmarkRows.length > 0 ? [{ id: "benchmarks", label: "Benchmarks" }] : []),
   ];
-
-  const [active, setActive] = useState(sections[0]?.id);
-  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.filter((e) => e.isIntersecting);
-        if (visible.length > 0) {
-          setActive(visible[0].target.id);
-        }
-      },
-      { rootMargin: "-15% 0px -70% 0px", threshold: 0 },
-    );
-
-    sections.forEach(({ id }) => {
-      const el = sectionRefs.current[id];
-      if (el) observer.observe(el);
-    });
-
-    return () => observer.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [model.slug]);
 
   return (
     <div className="mx-auto max-w-4xl px-8 py-12 sm:px-12">
@@ -68,39 +40,19 @@ export function ModelDetail({ model }: { model: ModelEntry }) {
         {model.params && <p className="mt-1 font-mono text-sm text-muted">{model.params} params</p>}
       </motion.div>
 
-      <nav className="sticky top-6 z-10 mt-8 flex w-fit flex-wrap gap-1 rounded-full border border-border bg-surface/90 p-1 text-sm backdrop-blur">
-        {sections.map((s) => (
-          <a
-            key={s.id}
-            href={`#${s.id}`}
-            className={`rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${
-              active === s.id ? "bg-teal-500 text-white" : "text-muted hover:text-heading"
-            }`}
-          >
-            {s.label}
-          </a>
-        ))}
-      </nav>
+      <div className="mt-8">
+        <StickyNav sections={sections} />
+      </div>
 
       <div className="mt-10 flex flex-col gap-16">
-        <section
-          id="overview"
-          ref={(el) => {
-            sectionRefs.current.overview = el;
-          }}
-        >
+        <section id="overview">
           <h2 className="font-mono text-sm text-teal-700">Overview</h2>
           <p className="mt-3 max-w-2xl text-base leading-relaxed text-body">
             {model.notes?.trim() ?? model.status ?? "No overview available yet."}
           </p>
         </section>
 
-        <section
-          id="architecture"
-          ref={(el) => {
-            sectionRefs.current.architecture = el;
-          }}
-        >
+        <section id="architecture">
           <h2 className="font-mono text-sm text-teal-700">Architecture</h2>
           <dl className="mt-4 grid max-w-2xl grid-cols-1 gap-x-8 gap-y-3 rounded-xl border border-border bg-surface p-6 sm:grid-cols-2">
             {model.vision_backbone && (
@@ -149,12 +101,7 @@ export function ModelDetail({ model }: { model: ModelEntry }) {
         </section>
 
         {prerequisites.length > 0 && (
-          <section
-            id="prerequisites"
-            ref={(el) => {
-              sectionRefs.current.prerequisites = el;
-            }}
-          >
+          <section id="prerequisites">
             <h2 className="font-mono text-sm text-teal-700">Prerequisites</h2>
             <ul className="mt-4 flex max-w-2xl flex-col gap-3">
               {prerequisites.map((p) => (
@@ -167,12 +114,7 @@ export function ModelDetail({ model }: { model: ModelEntry }) {
           </section>
         )}
 
-        <section
-          id="hardware-fit"
-          ref={(el) => {
-            sectionRefs.current["hardware-fit"] = el;
-          }}
-        >
+        <section id="hardware-fit">
           <h2 className="font-mono text-sm text-teal-700">Hardware fit</h2>
           <div
             className={`mt-4 max-w-2xl rounded-xl border p-5 ${
@@ -197,12 +139,7 @@ export function ModelDetail({ model }: { model: ModelEntry }) {
         </section>
 
         {benchmarkRows.length > 0 && (
-          <section
-            id="benchmarks"
-            ref={(el) => {
-              sectionRefs.current.benchmarks = el;
-            }}
-          >
+          <section id="benchmarks">
             <h2 className="font-mono text-sm text-teal-700">Benchmarks</h2>
             <div className="mt-4 overflow-x-auto rounded-xl border border-border">
               <table className="w-full min-w-[560px] text-left text-sm">
