@@ -16,6 +16,7 @@ export function Sidebar({ models }: { models: ModelEntry[] }) {
   const pathname = usePathname();
   const inModels = pathname.startsWith("/docs/models");
   const inCli = pathname.startsWith("/docs/cli");
+  const inSdk = pathname.startsWith("/docs/sdk");
 
   return (
     <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-border bg-surface-alt">
@@ -71,10 +72,14 @@ export function Sidebar({ models }: { models: ModelEntry[] }) {
           >
             CLI
           </Link>
-          <span className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm font-medium text-muted">
+          <Link
+            href="/docs/sdk"
+            className={`rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
+              inSdk ? "bg-teal-50 text-teal-700" : "text-body hover:bg-black/[0.03] hover:text-heading"
+            }`}
+          >
             SDK
-            <span className="font-mono text-[10px] tracking-wide uppercase">soon</span>
-          </span>
+          </Link>
         </div>
       </nav>
     </aside>
