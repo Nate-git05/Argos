@@ -146,6 +146,7 @@ class RunSession:
         self.instruction = instruction
         self.tokenizer = tokenizer
         self.max_state_dim = max_state_dim
+        self.started_at = time.time()
 
         self._queue: deque[np.ndarray] = deque()
         self._queue_lock = threading.Lock()
@@ -184,6 +185,7 @@ class DaemonState:
     sensors: dict[str, SensorConnection] = field(default_factory=dict)
     engine: EngineConnection | None = None
     run: RunSession | None = None
+    started_at: float = field(default_factory=time.time)
 
 
 state = DaemonState()

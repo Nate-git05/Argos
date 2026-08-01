@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 import cv2
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
@@ -7,6 +8,7 @@ from application.control.pid import move_to_positions
 from application.control.state import state
 from application.server.local.config.config import ACTUATOR_HOME_POSITION, ACTUATOR_HOME_TIMEOUT_S
 from application.server.local.routes import cli_commands
+from application.server.local.routes.hardware_connection import _actuator_device, _sensor_devices
 
 STREAM_FPS = 15
 
@@ -83,4 +85,26 @@ def get_logs(source: str | None = None, limit: int = 50):
     return {
         "engine": list(state.engine.logs)[-limit:] if state.engine is not None else None,
         "run": list(state.run.logs)[-limit:] if state.run is not None else None,
+    }
+
+
+@cli_commands.get("/status")
+def get_status():
+    now = time.time()
+    return {
+        "daemon_uptime_s": round(now - state.started_at, 1),
+        "run": {
+            "active": state.run is not None,
+            "model": state.run.model if state.run is not None else None,
+            "instruction": state.run.instruction if state.run is not None else None,
+            "uptime_s": round(now - state.run.started_at, 1) if state.run is not None else None,
+        },
+        "engine": {
+            "running": state.engine is not None and state.engine.process.poll() is None,
+            "model": state.engine.model if state.engine is not None else None,
+            "pid": state.engine.process.pid if state.engine is not None else None,
+            "bind_addr": state.engine.bind_addr if state.engine is not None else None,
+        },
+        "actuator": _actuator_device(),
+        "sensors": _sensor_devices(),
     }
