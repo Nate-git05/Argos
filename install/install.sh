@@ -82,6 +82,10 @@ log "installing Python dependencies"
 "${VENV_DIR}/bin/pip" install --quiet --upgrade pip
 "${VENV_DIR}/bin/pip" install --quiet -r "${APP_DIR}/requirements.txt"
 
+log "installing the argos CLI"
+"${VENV_DIR}/bin/pip" install --quiet -e "${REPO_ROOT}"
+sudo ln -sf "${VENV_DIR}/bin/argos" /usr/local/bin/argos
+
 # --- 4. build the vla.cpp inference engine -----------------------------------
 log "building vla.cpp engine (this can take a while the first time)"
 CMAKE_ARGS=(-B build -DCMAKE_BUILD_TYPE=Release)

@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "argos"
+version = "0.1.0"
+description = "CLI for running and connecting VLA models on real robots."
+requires-python = ">=3.10"
+dependencies = [
+    "typer",
+    "httpx",
+    "rich",
+]
+
+[project.scripts]
+argos = "application.cli.main:main"
+
+[tool.setuptools.packages.find]
+include = ["application*"]

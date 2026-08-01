@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 .venv/
+*.egg-info/
 application/server/local/services/engine/
 application/server/local/services/models/*.gguf
 .env
