@@ -1,3 +1,12 @@
+"""Actuator and sensor connection routes.
+
+Two separate routes, not one shared route with a type parameter --
+actuators and sensors have entirely different discovery mechanisms
+(pyserial port enumeration vs. OpenCV camera probing), different
+protocols, and different verification steps, so forcing them through one
+generic endpoint would just mean branching on type internally anyway.
+"""
+
 import base64
 
 import cv2
@@ -19,6 +28,10 @@ CAMERA_PROBE_LIMIT = 10
 
 
 def _discover_actuator_ports() -> list[dict]:
+    """Real device metadata via pyserial (vendor/product ID, description),
+    not just filenames from a directory listing -- lets a caller
+    distinguish "USB-Serial Controller" from a Bluetooth or virtual port
+    with a similar-looking /dev entry."""
     return [
         {"port": p.device, "description": p.description, "vid": p.vid, "pid": p.pid}
         for p in serial.tools.list_ports.comports()
@@ -27,6 +40,19 @@ def _discover_actuator_ports() -> list[dict]:
 
 @cli_commands.post("/connect/actuator")
 def connect_actuator(port: str | None = None, servo_ids: list[int] | None = Query(default=None)):
+    """No port -> discovery. With a port -> opens it and PINGS every
+    requested servo ID as the actual handshake, not just checking the
+    port opened (a port can open successfully against a device that isn't
+    a Feetech servo at all, or a servo that's powered off). servo_ids is
+    caller-supplied so a non-default arm configuration can be connected
+    without touching config.py; DEFAULT_SERVO_IDS is only the fallback
+    when the caller doesn't specify.
+
+    Note the `Query(default=None)` on servo_ids isn't decorative -- this
+    FastAPI version silently drops repeated list-typed query params
+    (?servo_ids=1&servo_ids=2) into a bare None without it, confirmed by
+    testing; a plain `= None` default looks identical but is a real bug.
+    """
     if port is None:
         return {"ports": _discover_actuator_ports()}
 
@@ -36,6 +62,9 @@ def connect_actuator(port: str | None = None, servo_ids: list[int] | None = Quer
     try:
         port_opened = port_handler.openPort()
     except serial.SerialException as e:
+        # openPort() raises rather than returning False for a genuinely
+        # bad port (nonexistent, permission denied, already in use) --
+        # confirmed by testing against a real bad path, not assumed.
         raise HTTPException(status_code=502, detail=f"failed to open {port!r}: {e}")
 
     if not port_opened:
@@ -63,6 +92,8 @@ def connect_actuator(port: str | None = None, servo_ids: list[int] | None = Quer
             detail=f"no servos responded on {port!r} (tried ids {ids})",
         )
 
+    # Only one actuator connection per session for V1 -- replacing it
+    # closes whatever was there first rather than leaking the old handle.
     if state.actuator is not None:
         state.actuator.close()
 
@@ -70,7 +101,7 @@ def connect_actuator(port: str | None = None, servo_ids: list[int] | None = Quer
         port=port,
         port_handler=port_handler,
         packet_handler=packet_handler,
-        servo_ids=[s["id"] for s in responded],
+        servo_ids=[s["id"] for s in responded],  # only the IDs that actually answered, not the full requested list
     )
 
     return {
@@ -82,6 +113,11 @@ def connect_actuator(port: str | None = None, servo_ids: list[int] | None = Quer
 
 
 def _discover_cameras() -> list[dict]:
+    """Probes indices 0..CAMERA_PROBE_LIMIT and grabs one frame from each
+    that opens, so the caller gets a visual preview to distinguish
+    cameras by, not just a bare index number. Every capture is released
+    immediately after probing -- discovery doesn't hold any camera open,
+    only an actual connect_sensor call (with index + view_name) does."""
     found = []
     for index in range(CAMERA_PROBE_LIMIT):
         cap = cv2.VideoCapture(index)
@@ -98,6 +134,19 @@ def _discover_cameras() -> list[dict]:
 
 @cli_commands.post("/connect/sensor")
 def connect_sensor(index: int | None = None, view_name: str | None = None):
+    """No index/view_name -> discovery. With both -> connects that camera
+    under view_name, which is required to exactly match one of the
+    eventual run target model's camera_views.keys (enforced later, in
+    run_model) -- that's what makes the mapping from "this physical
+    camera" to "this slot in the model's expected input order" exact
+    rather than a guess based on connection order.
+
+    isOpened() alone isn't sufficient verification -- a camera can report
+    open while never actually producing frames (permissions, driver
+    quirks, wrong backend). Grabbing and returning a real test frame here
+    is the actual proof it works, and the same frame doubles as visual
+    confirmation for whoever's connecting it.
+    """
     if index is None or view_name is None:
         return {
             "cameras": _discover_cameras(),
@@ -122,7 +171,7 @@ def connect_sensor(index: int | None = None, view_name: str | None = None):
 
     existing = state.sensors.get(view_name)
     if existing is not None:
-        existing.release()
+        existing.release()  # stops its background thread and releases the old capture before replacing it
 
     state.sensors[view_name] = SensorConnection(index=index, view_name=view_name, handle=cap)
 

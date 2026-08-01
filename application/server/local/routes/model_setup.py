@@ -1,3 +1,16 @@
+"""Model catalog + lifecycle routes: list what's available, pull weights,
+and run a model end to end.
+
+`run` is the one route in this whole daemon that does real work beyond a
+single request/response -- it validates every precondition, spawns the
+vla-server subprocess, loads the tokenizer, and then hands off to two
+background worker threads (application/control/inference.py and
+application/control/pid.py) that keep running long after this route
+returns its HTTP response. Everything before that hand-off is written to
+fail fast and cheap (cheapest checks first) so a bad request never gets as
+far as spawning a process or downloading a tokenizer.
+"""
+
 import os
 import subprocess
 import threading
@@ -23,11 +36,25 @@ console = Console()
 
 
 def _is_pulled(entry: dict) -> bool:
+    """Checks the actual weights file exists on disk rather than trusting
+    any cached/remembered state -- the source of truth for "is this model
+    pulled" is always the filesystem. Handles nested filenames correctly
+    (e.g. bitvla's "libero_object/bitvla-libero-object.gguf") since it
+    resolves the full relative path rather than comparing bare filenames
+    against a flat directory listing, which was a real bug caught earlier."""
     filename = entry.get("filename")
     return bool(filename) and (MODELS_DIR / filename).is_file()
 
 
 def _resolve_launch_config(entry: dict) -> tuple[str, dict]:
+    """Turns a catalog entry into what subprocess.Popen actually needs:
+    the resolved weights path and a real env dict. No per-model branching
+    here -- launch_env in models.yaml is already clean, machine-readable
+    data (deliberately restructured for exactly this reason: code should
+    never need to special-case a specific model name to run it). The one
+    thing this refuses to guess at is launch_env: null (currently only
+    gr00t-n1.6, which has multiple incompatible real deployments) --
+    that's a hard error, not a default to fall back on."""
     launch_env = entry.get("launch_env")
     if launch_env is None:
         raise HTTPException(
@@ -42,6 +69,11 @@ def _resolve_launch_config(entry: dict) -> tuple[str, dict]:
 
 @cli_commands.get("/list")
 def list_models():
+    """Catalog + local pull status for every model, regardless of whether
+    it's actually usable yet (missing tokenizer_repo, ambiguous
+    launch_env, etc. don't hide a model from this list -- they surface as
+    errors later, specifically when something tries to use that model,
+    not here)."""
     catalog = load_model_catalog()
 
     models = {
@@ -61,6 +93,10 @@ def list_models():
 
 @cli_commands.post("/pull/{name}")
 def pull_model(name: str):
+    """Downloads a model's weights straight into services/models/ (same
+    directory models.yaml lives in), authenticated with the daemon's own
+    HF token so gated repos work transparently once the account behind
+    that token has accepted the relevant license."""
     catalog = load_model_catalog()
 
     if name not in catalog:
@@ -92,6 +128,13 @@ def pull_model(name: str):
 
 @cli_commands.post("/run")
 def run_model(model: str, instruction: str):
+    """Validates every precondition (model pulled, actuator connected,
+    the model's EXACT required camera views connected, no engine already
+    running, the vla-server binary actually built), then spawns the
+    engine, loads the tokenizer, and starts both background workers.
+    Checks are ordered cheapest-first so a request that's going to fail
+    does so before anything expensive (subprocess spawn, tokenizer
+    download) happens."""
     if not instruction or not instruction.strip():
         raise HTTPException(status_code=400, detail="instruction is required")
 
@@ -108,6 +151,10 @@ def run_model(model: str, instruction: str):
     if state.actuator is None:
         raise HTTPException(status_code=400, detail="no actuator connected")
 
+    # Must match the model's camera_views.keys EXACTLY, not just be "enough
+    # cameras" -- the model was trained on a specific view ordering
+    # (front vs. wrist, etc.), and connect_sensor's view_name is required
+    # to be one of those exact key names for precisely this reason.
     required_views = (entry.get("camera_views") or {}).get("keys") or []
     missing_views = [v for v in required_views if v not in state.sensors]
     if missing_views:
@@ -132,7 +179,7 @@ def run_model(model: str, instruction: str):
         )
 
     ckpt_path, env = _resolve_launch_config(entry)
-    tokenizer = load_tokenizer(entry)  # fail before spawning the engine, not after
+    tokenizer = load_tokenizer(entry)  # deliberately before spawning the engine, not after -- fail cheap first
 
     process = subprocess.Popen(
         [str(VLA_SERVER_BINARY), ckpt_path, "--bind", ENGINE_BIND_ADDR],
@@ -161,9 +208,15 @@ def run_model(model: str, instruction: str):
         max_state_dim=entry["max_state_dim"],
     )
 
+    # Cameras were connected earlier (possibly long before this request)
+    # with capture deliberately paused to avoid burning CPU/power while
+    # idle -- this is the moment that actually turns capture on.
     for sensor in state.sensors.values():
         sensor.start_capture()
 
+    # Thread handles are stored on RunSession itself so /stop can join
+    # them later and know both loops have genuinely exited before tearing
+    # down the engine/actuator underneath them.
     state.run.inference_thread = threading.Thread(target=run_inference_worker, args=(state.run, entry), daemon=True)
     state.run.pid_thread = threading.Thread(target=run_pid_worker, args=(state.run,), daemon=True)
     state.run.inference_thread.start()
