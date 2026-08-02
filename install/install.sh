@@ -111,6 +111,13 @@ log "installing the argos CLI"
 sudo ln -sf "${VENV_DIR}/bin/argos" /usr/local/bin/argos
 
 # --- 4. build the vla.cpp inference engine -----------------------------------
+# ENGINE_DIR is gitignored -- it's a separate upstream project, not vendored
+# into this repo -- so it has to be cloned here before it can be built.
+if [[ ! -d "${ENGINE_DIR}/.git" ]]; then
+    log "cloning vla.cpp engine source"
+    git clone --depth 1 https://github.com/VinRobotics/vla.cpp.git "${ENGINE_DIR}"
+fi
+
 log "building vla.cpp engine (this can take a while the first time)"
 CMAKE_ARGS=(-B build -DCMAKE_BUILD_TYPE=Release)
 if [[ -n "${CUDA_ARCH}" ]]; then
