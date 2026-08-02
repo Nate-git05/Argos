@@ -29,3 +29,19 @@ sudo systemctl status argos     # check it's up
 journalctl -u argos -f          # follow its logs
 sudo systemctl stop argos       # stop it
 ```
+
+## Using the CLI
+
+`install.sh` also installs `argos` itself as a command on your `PATH`, talking to
+the daemon over HTTP:
+
+```
+argos list                                     # show the model catalog
+argos pull smolvla                             # download a model's weights
+argos connect actuator                         # list serial ports
+argos connect actuator --port /dev/ttyUSB0     # connect to one
+argos connect sensor                           # discover cameras
+argos connect sensor --index 0 --view <name>   # connect one under a view
+argos devices                                  # list what's connected
+argos run smolvla "pick up the red block"      # start a run
+```
