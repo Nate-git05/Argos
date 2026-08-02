@@ -1,0 +1,17 @@
+.git
+.env
+**/.env
+__pycache__
+*.pyc
+*.egg-info
+
+# Python venvs
+.venv
+application/.venv
+
+# Frontend -- deploys separately on Vercel, not part of this image
+web
+
+# Robot-side daemon and its vendored engine/model weights -- not part of
+# this image, and the engine dir in particular can be large
+application/server/local
