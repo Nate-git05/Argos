@@ -1,5 +1,2 @@
-from sqlalchemy.orm import DeclarativeBase  # SQLAlchemy 2.0 base class for ORM models
+from application.server.web.config.database import Base  # shared declarative base, defined alongside the engine/session  # noqa: F401
 
-
-class Base(DeclarativeBase):  # shared base every table model inherits from
-    pass
