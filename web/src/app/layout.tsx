@@ -13,6 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.xn--args-ira.com"),
   title: "Argos — Ollama for robot arms",
   description:
     "Run and connect open-source vision-language-action (VLA) models on real robots. Pull a model, connect your hardware, and run.",
