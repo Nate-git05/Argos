@@ -99,28 +99,45 @@ const commands: CommandSpec[] = [
 
 const inSessionCommands: CommandSpec[] = [
   {
-    name: "logs",
-    syntax: "GET /cli/logs",
+    name: "status",
+    syntax: "argos status",
     description:
-      "Returns both the inference engine's raw output and Argos's own pipeline log (frame captured, request sent, response received, correction applied) — everything that's happened since the run started. Today this lives on the daemon's API; a native `argos logs` command that talks to it while a run is active is coming.",
-    planned: true,
-    example: [{ type: "output", text: "$ curl http://127.0.0.1:8000/cli/logs" }],
+      "Reports what model is loaded, which devices are connected, and how long the daemon and the current run have each been up. Useful any time, not just mid-run — including as a first check that the daemon is actually reachable.",
+    example: [
+      { type: "command", text: "argos status" },
+      { type: "output", text: "daemon uptime: 142.3s" },
+      { type: "output", text: "run: smolvla \"pick up the red block\" (uptime 8.1s)" },
+      { type: "output", text: "engine: smolvla (pid=48213, bind=tcp://127.0.0.1:5555)" },
+      { type: "output", text: "actuator: {'port': '/dev/ttyUSB0', 'servo_ids': [1, 2, 3, 4, 5, 6]}" },
+      { type: "output", text: "sensors: {'observation.images.image': {'index': 0}}" },
+    ],
   },
   {
-    name: "status",
-    syntax: "GET /cli/status",
+    name: "logs",
+    syntax: "argos logs [--source engine|run] [--limit N]",
     description:
-      "Reports what model is loaded, which devices are connected, and how long the daemon and the current run have each been up. Same story as logs — available on the daemon today, landing as a CLI command next.",
-    planned: true,
-    example: [{ type: "output", text: "$ curl http://127.0.0.1:8000/cli/status" }],
+      "Shows both the inference engine's raw output and Argos's own pipeline log (frame captured, request sent, response received, correction applied) — everything that's happened since the run started. Filter to one source, or leave it off to see both.",
+    options: [
+      { flag: "--source", description: "Optional. Filter to 'engine' or 'run'. Omit to show both." },
+      { flag: "--limit", description: "Optional. Number of most-recent log lines to show. Defaults to 50." },
+    ],
+    example: [
+      { type: "command", text: "argos logs --source engine --limit 3" },
+      { type: "output", text: "--- engine ---" },
+      { type: "output", text: "loaded checkpoint smolvla-libero.gguf" },
+      { type: "output", text: "listening on tcp://127.0.0.1:5555" },
+      { type: "output", text: "bound to tcp://127.0.0.1:5555, ready" },
+    ],
   },
   {
     name: "stop",
-    syntax: "POST /cli/stop",
+    syntax: "argos stop",
     description:
       "Safely ends the active run: stops the control loop, drives the arm back to a home position, and shuts down the inference engine — the daemon itself keeps running throughout, ready for the next run.",
-    planned: true,
-    example: [{ type: "output", text: "$ curl -X POST http://127.0.0.1:8000/cli/stop" }],
+    example: [
+      { type: "command", text: "argos stop" },
+      { type: "success", text: "Stopped -- arm returned home." },
+    ],
   },
 ];
 
@@ -199,10 +216,9 @@ export default function CliDocsPage() {
           <div className="mt-10 max-w-2xl">
             <h3 className="font-mono text-sm font-medium text-heading">In-session commands</h3>
             <p className="mt-2 text-sm leading-relaxed text-body">
-              While a run is active, three more operations are available: checking logs, checking
-              status, and safely stopping. These exist today as routes on the daemon&apos;s own API —
-              wiring them into the CLI as interactive commands you can type while a run is in progress
-              is next.
+              While a run is active, three more commands are available: checking logs, checking
+              status, and safely stopping. They work outside an active run too — status and logs are
+              a normal first check that the daemon is up and reachable.
             </p>
           </div>
 
