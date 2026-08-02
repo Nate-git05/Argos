@@ -1,6 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# --- 0. bootstrap ------------------------------------------------------------
+# When this script is curled and piped straight into bash (`curl ... | bash`),
+# there's no real file on disk -- BASH_SOURCE[0] is empty, so the REPO_ROOT
+# resolution below has nothing to resolve. In that case, clone the repo first
+# and re-exec this same script from within the fresh checkout, where
+# BASH_SOURCE[0] is a real path.
+if [[ -z "${BASH_SOURCE[0]:-}" ]]; then
+    ARGOS_HOME="${ARGOS_HOME:-$HOME/argos}"
+    if ! command -v git >/dev/null 2>&1; then
+        echo "[install] git is required" >&2
+        exit 1
+    fi
+
+    if [[ -d "${ARGOS_HOME}/.git" ]]; then
+        echo "[install] ${ARGOS_HOME} already exists -- pulling latest"
+        git -C "${ARGOS_HOME}" pull --ff-only
+    else
+        echo "[install] cloning Argos into ${ARGOS_HOME}"
+        git clone --depth 1 https://github.com/Nate-git05/Argos.git "${ARGOS_HOME}"
+    fi
+
+    exec bash "${ARGOS_HOME}/install/install.sh"
+fi
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_DIR="${REPO_ROOT}/application"
 VENV_DIR="${APP_DIR}/.venv"

