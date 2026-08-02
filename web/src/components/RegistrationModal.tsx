@@ -4,14 +4,20 @@ import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001";
+
 export function RegistrationModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
 
     setSubmitted(false);
+    setSubmitting(false);
+    setError(null);
     firstInputRef.current?.focus();
 
     const previousOverflow = document.body.style.overflow;
@@ -30,11 +36,36 @@ export function RegistrationModal({ open, onClose }: { open: boolean; onClose: (
 
   if (!open) return null;
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    // No registration API exists yet -- this is UI-only for now, so the
-    // "success" state below is purely local, not a confirmed submission.
-    setSubmitted(true);
+    setError(null);
+    setSubmitting(true);
+
+    const formData = new FormData(e.currentTarget);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          first_name: formData.get("firstName"),
+          last_name: formData.get("lastName"),
+          email: formData.get("email"),
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        const detail = typeof data?.detail === "string" ? data.detail : "Something went wrong. Please try again.";
+        throw new Error(detail);
+      }
+
+      setSubmitted(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return createPortal(
@@ -112,11 +143,14 @@ export function RegistrationModal({ open, onClose }: { open: boolean; onClose: (
               Register to get updates on new features and changes to Argos.
             </p>
 
+            {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
+
             <button
               type="submit"
-              className="mt-5 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-teal-700 cursor-pointer"
+              disabled={submitting}
+              className="mt-5 w-full rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
             >
-              Submit
+              {submitting ? "Submitting..." : "Submit"}
             </button>
           </form>
         )}

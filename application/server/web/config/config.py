@@ -10,3 +10,12 @@ load_dotenv(ENV_PATH)  # populate os.environ from the .env file
 POSTGRES_URI = os.getenv("POSTGRES_URI")  # read the connection string into memory
 if not POSTGRES_URI:
     raise ValueError("POSTGRES_URI is not set in server/web/.env")  # fail loudly at import time, not on first query
+
+# Frontend and this API are separate deployments -- browser requests to
+# /register are cross-origin, so the frontend's origin(s) need to be
+# explicitly allowed. Overridable once the real API host is chosen.
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,https://www.xn--args-ira.com").split(",")
+    if origin.strip()
+]
