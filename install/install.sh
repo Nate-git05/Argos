@@ -119,7 +119,9 @@ if [[ ! -d "${ENGINE_DIR}/.git" ]]; then
 fi
 
 log "building vla.cpp engine (this can take a while the first time)"
-CMAKE_ARGS=(-B build -DCMAKE_BUILD_TYPE=Release)
+# -B (like -S) resolves relative paths against the caller's cwd, not against
+# -S -- must be absolute here, since curl | bash can be run from anywhere.
+CMAKE_ARGS=(-B "${ENGINE_DIR}/build" -DCMAKE_BUILD_TYPE=Release)
 if [[ -n "${CUDA_ARCH}" ]]; then
     CMAKE_ARGS+=(-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCH}")
 fi
