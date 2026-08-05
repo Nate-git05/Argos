@@ -135,18 +135,6 @@ export default function McpDocsPage() {
               parts of the workflow that are just setup, not actuation.
             </p>
           </div>
-
-          <div className="mt-5 max-w-2xl rounded-xl border border-border bg-teal-50 p-5">
-            <p className="text-sm leading-relaxed text-teal-900">
-              <span className="font-semibold">There is no tool here that moves the arm to run a task.</span>{" "}
-              <code className="rounded bg-surface px-1 py-0.5 font-mono text-xs">run</code> is deliberately
-              not exposed — starting a run means the inference engine begins actively writing goal
-              positions to real servos, and that decision is left to the user, run themselves via the
-              CLI (<code className="rounded bg-surface px-1 py-0.5 font-mono text-xs">argos run &lt;model&gt; &quot;&lt;instruction&gt;&quot;</code>).
-              The one exception is <code className="rounded bg-surface px-1 py-0.5 font-mono text-xs">stop</code>,
-              which only ever drives the arm to a fixed home position as part of safely halting a run.
-            </p>
-          </div>
         </section>
 
         <section id="installation">
