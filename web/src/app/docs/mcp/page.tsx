@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { CommandBlock, type CommandSpec } from "@/components/docs/CommandBlock";
 import { CliTerminal } from "@/components/docs/CliTerminal";
 import { StickyNav, type NavSection } from "@/components/docs/StickyNav";
@@ -7,7 +6,6 @@ const sections: NavSection[] = [
   { id: "overview", label: "Overview" },
   { id: "installation", label: "Installation" },
   { id: "tools", label: "Tools" },
-  { id: "resources", label: "Resources" },
 ];
 
 const tools: CommandSpec[] = [
@@ -132,9 +130,9 @@ export default function McpDocsPage() {
             <p>
               The Argos MCP server is the same kind of thin client the CLI is — every tool call is just
               an HTTP request to the daemon (<code className="rounded bg-surface-alt px-1.5 py-0.5 font-mono text-sm text-heading">http://127.0.0.1:8000</code>),
-              which has to already be running. It exists so an agent like Claude can help a user set up
-              and inspect their robot — connecting a serial port, discovering cameras, pulling a
-              model — the parts of the workflow that are just setup, not actuation.
+              which has to already be running. It exists so an AI agent can help a user set up and
+              inspect their robot — connecting a serial port, discovering cameras, pulling a model — the
+              parts of the workflow that are just setup, not actuation.
             </p>
           </div>
 
@@ -162,13 +160,10 @@ export default function McpDocsPage() {
             <CliTerminal lines={[{ type: "command", text: "curl -fsSL https://www.xn--args-ira.com/install | bash" }]} />
           </div>
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-body">
-            Then register it with your MCP host. For Claude Code:
-          </p>
-          <div className="mt-5">
-            <CliTerminal lines={[{ type: "command", text: "claude mcp add argos -- argos-mcp" }]} />
-          </div>
-          <p className="mt-5 max-w-2xl text-base leading-relaxed text-body">
-            For a host that reads a config file directly (e.g. Claude Desktop), add:
+            It&apos;s a standard stdio MCP server, so it works with any MCP-compatible agent or editor —
+            not just one vendor. Most hosts (Claude Desktop, Claude Code, Cursor, Windsurf, VS Code, …)
+            read the same <code className="rounded bg-surface-alt px-1.5 py-0.5 font-mono text-sm text-heading">mcpServers</code>{" "}
+            config shape:
           </p>
           <div className="mt-5">
             <CliTerminal
@@ -183,7 +178,14 @@ export default function McpDocsPage() {
             />
           </div>
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-body">
-            The daemon needs to be running before any tool call here will work:
+            Where that config lives depends on your host — check its docs for the exact file path. Some
+            hosts also offer a CLI shortcut instead of editing a file directly; Claude Code, for example:
+          </p>
+          <div className="mt-5">
+            <CliTerminal lines={[{ type: "command", text: "claude mcp add argos -- argos-mcp" }]} />
+          </div>
+          <p className="mt-5 max-w-2xl text-base leading-relaxed text-body">
+            Either way, the daemon needs to be running before any tool call here will work:
           </p>
           <div className="mt-5">
             <CliTerminal lines={[{ type: "command", text: "sudo systemctl start argos" }]} />
@@ -202,43 +204,6 @@ export default function McpDocsPage() {
             {tools.map((tool) => (
               <CommandBlock key={tool.name} command={tool} />
             ))}
-          </div>
-        </section>
-
-        <section id="resources">
-          <h2 className="font-mono text-sm text-teal-700">Resources</h2>
-          <p className="mt-3 max-w-2xl text-base leading-relaxed text-body">
-            Static reference content, not daemon state — these resolve straight from files in the repo
-            and don&apos;t need the daemon running.
-          </p>
-
-          <div className="mt-8 flex flex-col gap-5">
-            <div className="rounded-xl border border-border bg-surface p-6 sm:p-7">
-              <code className="font-mono text-base font-semibold text-heading">argos://readme</code>
-              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-body">The project README.</p>
-            </div>
-            <div className="rounded-xl border border-border bg-surface p-6 sm:p-7">
-              <code className="font-mono text-base font-semibold text-heading">argos://guide</code>
-              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-body">
-                An agent-facing guide: how the daemon, CLI, and MCP server fit together, which tools are
-                available here and why <code className="rounded bg-surface-alt px-1 py-0.5 font-mono text-xs">run</code>{" "}
-                isn&apos;t one of them, a suggested setup workflow, and a full{" "}
-                <code className="rounded bg-surface-alt px-1 py-0.5 font-mono text-xs">argos --help</code>-equivalent
-                CLI command reference — including commands only reachable via the CLI, so the agent can
-                still explain them accurately.
-              </p>
-            </div>
-            <div className="rounded-xl border border-border bg-surface p-6 sm:p-7">
-              <code className="font-mono text-base font-semibold text-heading">argos://models</code>
-              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-body">
-                The full model catalog write-up — architecture, benchmarks, hardware fit, and confidence
-                notes for every model Argos knows about. The same content as the{" "}
-                <Link href="/docs/models" className="text-teal-700 underline underline-offset-2">
-                  Models
-                </Link>{" "}
-                docs, in prose form for an agent to read directly.
-              </p>
-            </div>
           </div>
         </section>
       </div>
