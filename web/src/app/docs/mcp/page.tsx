@@ -215,8 +215,17 @@ export default function McpDocsPage() {
           <div className="mt-8 flex flex-col gap-5">
             <div className="rounded-xl border border-border bg-surface p-6 sm:p-7">
               <code className="font-mono text-base font-semibold text-heading">argos://readme</code>
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-body">The project README.</p>
+            </div>
+            <div className="rounded-xl border border-border bg-surface p-6 sm:p-7">
+              <code className="font-mono text-base font-semibold text-heading">argos://guide</code>
               <p className="mt-3 max-w-2xl text-sm leading-relaxed text-body">
-                The project README — what Argos is and how the daemon, CLI, and MCP server fit together.
+                An agent-facing guide: how the daemon, CLI, and MCP server fit together, which tools are
+                available here and why <code className="rounded bg-surface-alt px-1 py-0.5 font-mono text-xs">run</code>{" "}
+                isn&apos;t one of them, a suggested setup workflow, and a full{" "}
+                <code className="rounded bg-surface-alt px-1 py-0.5 font-mono text-xs">argos --help</code>-equivalent
+                CLI command reference — including commands only reachable via the CLI, so the agent can
+                still explain them accurately.
               </p>
             </div>
             <div className="rounded-xl border border-border bg-surface p-6 sm:p-7">
