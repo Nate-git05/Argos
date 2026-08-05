@@ -11,10 +11,12 @@ dependencies = [
     "typer",
     "httpx",
     "rich",
+    "mcp>=2.0",
 ]
 
 [project.scripts]
 argos = "application.cli.main:main"
+argos-mcp = "application.mcp.main:main"
 
 [tool.setuptools.packages.find]
 include = ["application*"]

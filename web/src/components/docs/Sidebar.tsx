@@ -16,6 +16,7 @@ export function Sidebar({ models }: { models: ModelEntry[] }) {
   const pathname = usePathname();
   const inModels = pathname.startsWith("/docs/models");
   const inCli = pathname.startsWith("/docs/cli");
+  const inMcp = pathname.startsWith("/docs/mcp");
   const inSdk = pathname.startsWith("/docs/sdk");
   const inSandbox = pathname.startsWith("/docs/sandbox");
 
@@ -82,6 +83,14 @@ export function Sidebar({ models }: { models: ModelEntry[] }) {
             }`}
           >
             CLI
+          </Link>
+          <Link
+            href="/docs/mcp"
+            className={`rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
+              inMcp ? "bg-teal-50 text-teal-700" : "text-body hover:bg-black/[0.03] hover:text-heading"
+            }`}
+          >
+            MCP
           </Link>
           <Link
             href="/docs/sdk"
